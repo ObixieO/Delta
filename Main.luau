@@ -35,9 +35,12 @@ local function Create(ClassName,Properties)
 	return I
 end
 
+
+
 if RunService:IsStudio() then
 	Delta.Ui = Player.PlayerGui:WaitForChild("Delta")
 else
+	local IsFile = isfile("DeltaUiCached")
 	if not isfolder("SavedScripts") then
 		makefolder("SavedScripts")
 	end
@@ -48,16 +51,20 @@ else
 		end
 	end
 	
-	local IsFile = isfile("DeltaUiCached")
+	local Loadedevent = Instance.new("BindableEvent")
+	
 	task.spawn(function()
 		writefile("DeltaUiCached",game:HttpGet(Delta.UIDownloadUrl))
 		if not IsFile then
 			Delta.Ui = game:GetObjects(getcustomasset("DeltaUiCached"))[1]
 		end
+		Loadedevent:Fire()
 	end)
 	
 	if IsFile then
 		Delta.Ui = game:GetObjects(getcustomasset("DeltaUiCached"))[1]
+	else
+		Loadedevent.Event:Wait()
 	end
 end
 
