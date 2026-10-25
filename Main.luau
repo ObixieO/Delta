@@ -424,6 +424,7 @@ function Delta:Init()
 	Buttons.Save.MouseButton1Click:Connect(function()
 		local Name = Delta.CurrentScript.Button.Name
 		writefile(`SavedScripts/{Name}`,Delta.CurrentScript.Source)
+		Delta:RefreshSavedScript()
 	end)
 	
 	for i,v in Delta.Ui.NavIsland.Buttons:GetChildren() do
