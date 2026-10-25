@@ -66,6 +66,8 @@ else
 	else
 		Loadedevent.Event:Wait()
 	end
+	
+	Delta.Ui.Parent = gethui()
 end
 
 for i,v in Delta.Ui.NavIsland.Buttons:GetChildren() do
