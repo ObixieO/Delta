@@ -42,7 +42,7 @@ else
 		makefolder("SavedScripts")
 	end
 	
-	for i,v in gethui() do
+	for i,v in gethui():GetChildren() do
 		if v:FindFirstChild("UILibrary") and v:FindFirstChild("MainScript") then
 			Delta.DeltaUi = v
 		end
