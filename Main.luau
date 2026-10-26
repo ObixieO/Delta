@@ -380,11 +380,11 @@ function Delta:AddConsoleMessage(Side, Message, MessageType)
 	local t = os.date("*t")
 	local str = string.format("%02d:%02d:%02d", t.hour, t.min, t.sec)
 
-	local Text = Message
+	local Text = tostring(Message)
 	local NewText: TextLabel = ConsoleUi:FindFirstChild(Side).UIListLayout.TextLabel:Clone()
 
 	NewText.RichText = true
-	NewText.Text = string.format('<font color="#FFFFFF">[%s]</font> %s', str, Message)
+	NewText.Text = string.format('<font color="#FFFFFF">[%s]</font> %s', str, Text)
 	NewText.TextSize = 14
 
 	NewText.TextColor3 =
