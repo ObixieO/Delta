@@ -386,8 +386,8 @@ function Delta:AddScript(Name,scr)
 		local OldScript = Delta.Scripts[FinalName]
 		
 		Delta.Scripts[FinalName] = nil
-		
-		Delta.Scripts[GetScriptName(NewScriptButton.TextBox.Text)] = OldScript
+		FinalName = GetScriptName(NewScriptButton.TextBox.Text)
+		Delta.Scripts[FinalName] = OldScript
 		NewScriptButton.Text = NewScriptButton.TextBox.Text
 		NewScriptButton.TextTransparency = 0
 	end)
