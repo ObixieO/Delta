@@ -6,7 +6,6 @@ local DefaultScript = [[
 ]]
 
 local Delta = {
-	UIDownloadUrl = "https://raw.githubusercontent.com/ObixieO/Delta/refs/heads/main/DeltaUi.rbxm",
 	UiTransparency = {},
 	Closed = true,
 	Connections = {},
@@ -69,7 +68,6 @@ end
 if RunService:IsStudio() then
 	Delta.Ui = Player.PlayerGui:WaitForChild("Delta")
 else
-	local IsFile = isfile("DeltaUiCached")
 	if not isfolder("SavedScripts") then
 		makefolder("SavedScripts")
 	end
@@ -84,21 +82,7 @@ else
 	
 	local Loadedevent = Instance.new("BindableEvent")
 	
-	task.spawn(function()
-		writefile("DeltaUiCached",game:HttpGet(Delta.UIDownloadUrl))
-		writefile("CompletionModule",game:HttpGet("https://raw.githubusercontent.com/ObixieO/Delta/refs/heads/main/CompletionModule.luau"))
-		if not IsFile then
-			Delta.Ui = game:GetObjects(getcustomasset("DeltaUiCached"))[1]
-		end
-		Loadedevent:Fire()
-	end)
-	
-	if IsFile then
-		Delta.Ui = game:GetObjects(getcustomasset("DeltaUiCached"))[1]
-	else
-		Loadedevent.Event:Wait()
-	end
-	
+	Delta.Ui = game:GetObjects(getcustomasset("DeltaUiCached"))[1]
 	Delta.Ui.Parent = gethui()
 end
 
@@ -134,6 +118,12 @@ function Delta:OpenUi()
 	Tween(Delta.Ui.ContentIsland.UIStroke,{.25},{
 		Transparency = .5
 	})
+	
+	if Delta.Ui.NavIsland:FindFirstChild("Logo") then
+		Tween(Delta.Ui.NavIsland.Logo,{.1},{
+			ImageTransparency = 1
+		})
+	end
 	
 	for i,v in Delta.Ui.NavIsland.Buttons:GetChildren() do
 		if v:IsA("TextButton") then
@@ -176,6 +166,11 @@ function Delta:CloseUi()
 	local Id = tick()
 	Delta.CloseId = Id
 	
+	if Delta.Ui.NavIsland:FindFirstChild("Logo") then
+		Tween(Delta.Ui.NavIsland.Logo,{.1},{
+			ImageTransparency = 0
+		})
+	end
 	Tween(Delta.Ui.ContentIsland,{.25},{
 		GroupTransparency = 1
 	})
@@ -866,12 +861,14 @@ function Delta:Init()
 		Step = 10,
 	},function(Number)
 		Delta.Settings.CurrentSettings.Fpscap = Number
-		UpdateSettings()
-		if RunService:IsStudio() then
-			return
+		
+		if not RunService:IsStudio() then
+			setfflag("TaskSchedulerLimitTargetFpsTo2402","False")
+			setfflag("GameBasicSettingsFramerateCap5","False")
+			setfflag("TaskSchedulerTargetFps",Number)
 		end
 		
-		setfflag("TaskSchedulerTargetFps",Number)
+		UpdateSettings()
 	end)
 	
 	local FOV = 0
@@ -968,6 +965,17 @@ function Delta:Init()
 	
 	Delta:AddScript("Script",DefaultScript)
 	Delta:OpenScript("Script")
+	
+	if not RunService:IsStudio() then
+		Create("ImageLabel",{
+			Name = "Logo",
+			Parent = Delta.Ui.NavIsland,
+			Image = getcustomasset("logo.png"),
+			Size = UDim2.new(1,1),
+			BackgroundTransparency = 1,
+			ScaleType = Enum.ScaleType.Fit
+		})
+	end
 	
 	for i,v in Delta.DeltaUi do
 		v.Enabled = false
