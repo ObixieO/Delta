@@ -759,9 +759,7 @@ end
 -- UI
 -- ============================================================
 local function getOrCreateGui()
-	local player = Players.LocalPlayer
-	local playerGui = player:WaitForChild("PlayerGui")
-	local screenGui = playerGui:FindFirstChild("CompletionGui")
+	local screenGui = gethui():FindFirstChild("CompletionGui")
 	if not screenGui then
 		screenGui = Instance.new("ScreenGui")
 		screenGui.Name = "CompletionGui"
@@ -769,7 +767,7 @@ local function getOrCreateGui()
 		screenGui.DisplayOrder = 9999
 		screenGui.IgnoreGuiInset = true
 		screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-		screenGui.Parent = playerGui
+		screenGui.Parent = gethui()
 	end
 	return screenGui
 end
