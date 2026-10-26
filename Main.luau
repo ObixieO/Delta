@@ -619,11 +619,9 @@ function Delta:Init()
 		
 		getgenv().print = function(...)
 			Delta:AddConsoleMessage("Delta",table.concat({...}," "),Enum.MessageType.MessageOutput)
-			return oldprint(...)
 		end
 		getgenv().warn = function(...)
 			Delta:AddConsoleMessage("Delta",table.concat({...}," "),Enum.MessageType.MessageWarning)
-			return oldwarn(...)
 		end
 		getgenv().error = function(Message,level)
 			Delta:AddConsoleMessage("Delta",Message or "Error occurred, no output from Luau.",Enum.MessageType.MessageError)
@@ -635,7 +633,6 @@ function Delta:Init()
 				Delta:AddConsoleMessage("Delta",v,Enum.MessageType.MessageInfo)
 			end
 			Delta:AddConsoleMessage("Delta","Stack End",Enum.MessageType.MessageInfo)
-			return olderror(Message,level)
 		end
 	end
 	
