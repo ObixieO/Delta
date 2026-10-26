@@ -15,6 +15,15 @@ local Delta = {
 	CurrentScript = nil,
 	Highlighter = {},
 	DeltaUi = nil,
+	NavIslandPositions = {
+		Top = {
+			Position = UDim2.new(0.5,0,0,58),
+		},
+		Bottom = {
+			Position = UDim2.new(0.5,0,1,-40),
+		},
+	},
+	CurrentNavIslandPosition = "Top",
 }
 
 local StarterGui = game:GetService("StarterGui")
@@ -22,6 +31,8 @@ local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
+local LogService = game:GetService("LogService")
+local ScriptContext = game:GetService("ScriptContext")
 local Player = Players.LocalPlayer
 
 local function Tween(Obj,Info,Properties)
@@ -55,6 +66,7 @@ else
 	
 	task.spawn(function()
 		writefile("DeltaUiCached",game:HttpGet(Delta.UIDownloadUrl))
+		writefile("CompletionModule",game:HttpGet("https://raw.githubusercontent.com/ObixieO/Delta/refs/heads/main/CompletionModule.luau"))
 		if not IsFile then
 			Delta.Ui = game:GetObjects(getcustomasset("DeltaUiCached"))[1]
 		end
@@ -74,6 +86,7 @@ for i,v in Delta.Ui.NavIsland.Buttons:GetChildren() do
 	if v:IsA("TextButton") then
 		Delta.UiTransparency[v] = {
 			BackgroundTransparency = v.BackgroundTransparency,
+			TextTransparency = v.TextTransparency,
 		}
 		
 		if v:FindFirstChild("UIStroke") then
@@ -105,7 +118,8 @@ function Delta:OpenUi()
 			v.Visible = true
 			
 			Tween(v,{.1},{
-				BackgroundTransparency = Delta.UiTransparency[v].BackgroundTransparency
+				BackgroundTransparency = Delta.UiTransparency[v].BackgroundTransparency,
+				TextTransparency = Delta.UiTransparency[v].TextTransparency,
 			})
 			Tween(v.UIStroke,{.1},{
 				Transparency = Delta.UiTransparency[v.UIStroke].Transparency
@@ -149,7 +163,8 @@ function Delta:CloseUi()
 	for i,v in Delta.Ui.NavIsland.Buttons:GetChildren() do
 		if v:IsA("TextButton") then
 			Tween(v,{.1},{
-				BackgroundTransparency = 1
+				BackgroundTransparency = 1,
+				TextTransparency = 1,
 			})
 			Tween(v.UIStroke,{.1},{
 				Transparency = 1
@@ -226,6 +241,20 @@ function Delta:TogglePage(Page)
 		Tween(Delta.Ui.ContentIsland,{.1},{
 			GroupTransparency = 1
 		})
+		for i,v in Delta.Ui.NavIsland.Buttons:GetChildren() do
+			if v:IsA("TextButton") and Delta.Ui.ContentIsland.Main:FindFirstChild(v.Name) then
+				Tween(v,{.1},{
+					BackgroundColor3 = v.Name == Page and Color3.fromRGB(120, 180, 255) or Color3.fromRGB(28, 32, 46),
+					BackgroundTransparency = v.Name == Page and 0.55 or 0.9,
+					TextColor3 = v.Name == Page and Color3.fromRGB(240, 244, 255) or Color3.fromRGB(150, 160, 190),
+				})
+				Tween(v.UIStroke,{.1},{
+					Color = v.Name == Page and Color3.fromRGB(120, 180, 255) or Color3.fromRGB(28, 32, 46),
+					Transparency = v.Name == Page and 0.2 or 0.95,
+				})
+			end
+		end
+		
 		task.wait(.1)
 		for i,v in Delta.Ui.ContentIsland.Main:GetChildren() do
 			v.Visible = false
@@ -310,6 +339,67 @@ function Delta:RemoveScript(Name)
 	if ScriptButton then
 		ScriptButton:Destroy()
 	end
+end
+
+local ConsoleUi = Delta.Ui.ContentIsland.Main.console
+
+local function AutoScroll(scrollingframe)
+	local stickToBottom = true
+	local internalScroll = false
+
+	local function getMaxScrollY(sf: ScrollingFrame): number
+		return math.max(0, sf.AbsoluteCanvasSize.Y - sf.AbsoluteWindowSize.Y)
+	end
+
+	local function scrollToBottom()
+		local maxY = getMaxScrollY(scrollingframe)
+		internalScroll = true
+		scrollingframe.CanvasPosition = Vector2.new(scrollingframe.CanvasPosition.X, maxY)
+		task.defer(function()
+			internalScroll = false
+		end)
+	end
+
+	scrollingframe:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
+		if internalScroll then return end
+		stickToBottom = scrollingframe.CanvasPosition.Y >= getMaxScrollY(scrollingframe) - 2
+	end)
+	scrollingframe:GetPropertyChangedSignal("AbsoluteCanvasSize"):Connect(function()
+		if not stickToBottom then return end
+		scrollToBottom()
+	end)
+	scrollingframe:GetPropertyChangedSignal("AbsoluteWindowSize"):Connect(function()
+		if not stickToBottom then return end
+		scrollToBottom()
+	end)
+
+end
+
+
+function Delta:AddConsoleMessage(Side, Message, MessageType)
+	local t = os.date("*t")
+	local str = string.format("%02d:%02d:%02d", t.hour, t.min, t.sec)
+
+	local Text = Message
+	local NewText: TextLabel = ConsoleUi:FindFirstChild(Side).UIListLayout.TextLabel:Clone()
+
+	NewText.RichText = true
+	NewText.Text = string.format('<font color="#FFFFFF">[%s]</font> %s', str, Message)
+	NewText.TextSize = 14
+
+	NewText.TextColor3 =
+		(MessageType == Enum.MessageType.MessageError   and Color3.fromRGB(231, 87, 80))  or
+		(MessageType == Enum.MessageType.MessageWarning and Color3.fromRGB(245, 118, 48)) or
+		(MessageType == Enum.MessageType.MessageInfo    and Color3.fromRGB(107, 180, 255)) or
+		Color3.fromRGB(255, 255, 255)
+
+	if (MessageType == Enum.MessageType.MessageError) or (MessageType == Enum.MessageType.MessageWarning) then
+		local n = NewText.FontFace
+		n.Weight = Enum.FontWeight.ExtraBold
+		NewText.FontFace = n
+	end
+
+	NewText.Parent = ConsoleUi:FindFirstChild(Side)
 end
 
 function Delta:RefreshSavedScript()
@@ -403,6 +493,10 @@ function Delta:Init()
 		Delta.CurrentScript.Source = Text
 	end)
 	
+	local Completion = RunService:IsStudio() and require(script.CompletionModule) or loadstring(readfile("CompletionModule"))()
+
+	Completion.bind(CodeInput,{})
+	
 	CodeFrame.ScrollingFrame:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
 		CodeFrame.Line.CanvasPosition = CodeFrame.ScrollingFrame.CanvasPosition
 	end)
@@ -426,6 +520,25 @@ function Delta:Init()
 		Delta:RefreshSavedScript()
 	end)
 	
+	local SavedUi = Delta.Ui.ContentIsland.Main.saved
+	SavedUi.Frame.TextBox:GetPropertyChangedSignal("Text"):Connect(function()
+		local Text = SavedUi.Frame.TextBox.Text
+		if string.gsub(Text," ","") == "" then
+			for i,v in SavedUi.ScrollingFrame:GetChildren() do
+				if v:IsA("Frame") then
+					v.Visible = true
+				end
+			end
+			return
+		end
+		
+		for i,v in SavedUi.ScrollingFrame:GetChildren() do
+			if v:IsA("Frame") and not v.TextLabel.Text:find(Text) then
+				v.Visible = false
+			end
+		end
+	end)
+	
 	for i,v in Delta.Ui.NavIsland.Buttons:GetChildren() do
 		if v:IsA("TextButton") then
 			v.MouseButton1Click:Connect(function()
@@ -436,8 +549,94 @@ function Delta:Init()
 		end
 	end
 	
+	LogService.MessageOut:Connect(function(Message,MessageType)
+		if not RunService:IsStudio() and MessageType == Enum.MessageType.MessageError then return end
+		Delta:AddConsoleMessage("Roblox",Message,MessageType)
+	end)
+	
+	AutoScroll(ConsoleUi.Roblox)
+	AutoScroll(ConsoleUi.Delta)
+	
 	if not RunService:IsStudio() then
 		Delta:RefreshSavedScript()
+	end
+	
+	local oldprint = print
+	local oldwarn = warn
+	local olderror = error
+	
+	if RunService:IsStudio() then
+		getfenv().print = function(...)
+			Delta:AddConsoleMessage("Delta",table.concat({...}," "),Enum.MessageType.MessageOutput)
+			return oldprint(...)
+		end
+		getfenv().warn = function(...)
+			Delta:AddConsoleMessage("Delta",table.concat({...}," "),Enum.MessageType.MessageWarning)
+			return oldwarn(...)
+		end
+		getfenv().error = function(Message,level)
+			Delta:AddConsoleMessage("Delta",Message or "Error occurred, no output from Luau.",Enum.MessageType.MessageError)
+			Delta:AddConsoleMessage("Delta","Stack Begin",Enum.MessageType.MessageInfo)
+			local startLevel = math.max(2, (level or 1) + 1)
+			local Frame = debug.traceback(nil, startLevel)
+			for i,v in string.split(Frame,"\n") do
+				if v == "" then continue end
+				Delta:AddConsoleMessage("Delta",v,Enum.MessageType.MessageInfo)
+			end
+			Delta:AddConsoleMessage("Delta","Stack End",Enum.MessageType.MessageInfo)
+			return olderror(Message,level)
+		end
+	else
+		ScriptContext.Error:Connect(function(message, stackTrace, Tscript)
+			local scriptName = Tscript and Tscript:GetFullName() or "Unknown"
+			if Tscript == script or (Tscript.Parent == nil and Tscript.Name == "LocalScript") then
+				Delta:AddConsoleMessage("Delta", message, Enum.MessageType.MessageError)
+
+				if stackTrace and stackTrace ~= "" then
+					Delta:AddConsoleMessage("Delta", "Stack Begin", Enum.MessageType.MessageInfo)
+					for line in stackTrace:gmatch("([^\n]*)\n?") do
+						if line ~= "" then
+							Delta:AddConsoleMessage("Delta", line, Enum.MessageType.MessageInfo)
+						end
+					end
+					Delta:AddConsoleMessage("Delta", "Stack End", Enum.MessageType.MessageInfo)
+				end
+				return
+			end
+			
+			Delta:AddConsoleMessage("Roblox", message, Enum.MessageType.MessageError)
+
+			if stackTrace and stackTrace ~= "" then
+				Delta:AddConsoleMessage("Roblox", "Stack Begin", Enum.MessageType.MessageInfo)
+				for line in stackTrace:gmatch("([^\n]*)\n?") do
+					if line ~= "" then
+						Delta:AddConsoleMessage("Roblox", line, Enum.MessageType.MessageInfo)
+					end
+				end
+				Delta:AddConsoleMessage("Roblox", "Stack End", Enum.MessageType.MessageInfo)
+			end
+		end)
+		
+		getgenv().print = function(...)
+			Delta:AddConsoleMessage("Delta",table.concat({...}," "),Enum.MessageType.MessageOutput)
+			return oldprint(...)
+		end
+		getgenv().warn = function(...)
+			Delta:AddConsoleMessage("Delta",table.concat({...}," "),Enum.MessageType.MessageWarning)
+			return oldwarn(...)
+		end
+		getgenv().error = function(Message,level)
+			Delta:AddConsoleMessage("Delta",Message or "Error occurred, no output from Luau.",Enum.MessageType.MessageError)
+			Delta:AddConsoleMessage("Delta","Stack Begin",Enum.MessageType.MessageInfo)
+			local startLevel = math.max(2, (level or 1) + 1)
+			local Frame = debug.traceback(nil, startLevel)
+			for i,v in string.split(Frame,"\n") do
+				if v == "" then continue end
+				Delta:AddConsoleMessage("Delta",v,Enum.MessageType.MessageInfo)
+			end
+			Delta:AddConsoleMessage("Delta","Stack End",Enum.MessageType.MessageInfo)
+			return olderror(Message,level)
+		end
 	end
 	
 	Delta:CloseUi()
