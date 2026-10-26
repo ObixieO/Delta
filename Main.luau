@@ -14,7 +14,7 @@ local Delta = {
 	Scripts = {},
 	CurrentScript = nil,
 	Highlighter = {},
-	DeltaUi = nil,
+	DeltaUi = {},
 	NavIslandPositions = {
 		Top = {
 			Position = UDim2.new(0.5,0,0,58),
@@ -22,8 +22,13 @@ local Delta = {
 		Bottom = {
 			Position = UDim2.new(0.5,0,1,-40),
 		},
+		Right = {
+			Size = UDim2.fromOffset(60,230),
+			Position = UDim2.new(.95,0,.5,58),
+			Vertical = true
+		},
 	},
-	CurrentNavIslandPosition = "Top",
+	Openned = true,
 }
 
 local StarterGui = game:GetService("StarterGui")
@@ -33,6 +38,10 @@ local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local LogService = game:GetService("LogService")
 local ScriptContext = game:GetService("ScriptContext")
+local GuiService = game:GetService("GuiService")
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
+
 local Player = Players.LocalPlayer
 
 local function Tween(Obj,Info,Properties)
@@ -46,7 +55,16 @@ local function Create(ClassName,Properties)
 	return I
 end
 
-
+local function GetInScreenPosition(Position, Size)
+	local C = workspace.Camera
+	if not C then return Position end
+	local screenSize = C.ViewportSize
+	
+	return Vector2.new(
+		math.clamp(Position.X, 0, math.max(0, screenSize.X - Size.X)),
+		math.clamp(Position.Y, 0, math.max(0, screenSize.Y - Size.Y))
+	)
+end
 
 if RunService:IsStudio() then
 	Delta.Ui = Player.PlayerGui:WaitForChild("Delta")
@@ -57,8 +75,10 @@ else
 	end
 	
 	for i,v in gethui():GetChildren() do
-		if v:FindFirstChild("UILibrary") and v:FindFirstChild("MainScript") then
-			Delta.DeltaUi = v
+		if (v:FindFirstChild("MainScript") and v:FindFirstChild("UILibrary")) then
+			Delta.DeltaUi.Main = v
+		elseif (#v:GetChildren() == 1 and v:FindFirstChildOfClass("ImageButton") and v:FindFirstChildOfClass("ImageButton").Image:find("logo.png")) then
+			Delta.DeltaUi.Logo = v
 		end
 	end
 	
@@ -98,6 +118,8 @@ for i,v in Delta.Ui.NavIsland.Buttons:GetChildren() do
 end
 
 function Delta:OpenUi()
+	if Delta.Openned then return end
+	Delta.Openned = true
 	local Id = tick()
 	Delta.OpenId = Id
 	
@@ -135,11 +157,13 @@ function Delta:OpenUi()
 		Delta.Ui.NavIsland.DragButton.Visible = false
 	end)
 
-	Tween(Delta.Ui.NavIsland,{.1},{
-		Size = UDim2.fromOffset(320,44),
-		Position = UDim2.new(.5,0,0,58)
-	})
+	local CurrentConfig = Delta.NavIslandPositions[Delta.Settings.CurrentSettings.CurrentNavIslandPosition[1]]
 
+	Tween(Delta.Ui.NavIsland,{.1},{
+		Size = CurrentConfig.Size or UDim2.fromOffset(320,44),
+		Position = CurrentConfig.Position
+	})
+	Delta.Ui.NavIsland.Buttons.UIListLayout.FillDirection = CurrentConfig.Vertical and Enum.FillDirection.Vertical or Enum.FillDirection.Horizontal
 	
 	if Delta.Connections.Drag then
 		Delta.Connections.Drag:Disconnect()
@@ -147,6 +171,8 @@ function Delta:OpenUi()
 end
 
 function Delta:CloseUi()
+	if not Delta.Openned then return end
+	Delta.Openned = false
 	local Id = tick()
 	Delta.CloseId = Id
 	
@@ -283,10 +309,11 @@ function Delta:OpenScript(Name)
 	
 	if Delta.CurrentScript then
 		Tween(Delta.CurrentScript.Button,{.25},{
-			BackgroundColor3 = Color3.fromRGB(91, 116, 110)
+			BackgroundColor3 = Color3.fromRGB(28, 32, 46)
 		})
 		Tween(Delta.CurrentScript.Button.UIStroke,{.25},{
-			Color = Color3.fromRGB(91, 116, 110)
+			Color = Color3.fromRGB(120, 180, 255),
+			Transparency = 0.8,
 		})
 	end
 	
@@ -294,7 +321,8 @@ function Delta:OpenScript(Name)
 		BackgroundColor3 = Color3.fromRGB(131, 216, 255)
 	})
 	Tween(Script.Button.UIStroke,{.25},{
-		Color = Color3.fromRGB(131, 216, 255)
+		Color = Color3.fromRGB(131, 216, 255),
+		Transparency = 0.2,
 	})
 	
 	CodeFrame.Text.Code.ScrollingFrame.TextBox.Text = Script.Source
@@ -303,8 +331,7 @@ function Delta:OpenScript(Name)
 
 end
 
-function Delta:AddScript(Name,scr)
-	scr = scr or ""
+local function GetScriptName(Name)
 	local FinalName = Name
 	if Delta.Scripts[Name] then
 		local c = 1
@@ -313,16 +340,63 @@ function Delta:AddScript(Name,scr)
 			c += 1
 		end
 	end
+	return FinalName
+end
+
+function Delta:AddScript(Name,scr)
+	scr = scr or ""
+	local FinalName = GetScriptName(Name)
 	local Scripts = Delta.Ui.ContentIsland.Main.code.Buttons.Scripts
 	local NewScriptButton = Scripts.UIListLayout.TextButton:Clone()
 	NewScriptButton.Name = FinalName
 	NewScriptButton.Text = FinalName
 	NewScriptButton.Parent = Scripts
 	
-	NewScriptButton.MouseButton1Click:Connect(function()
-		Delta:OpenScript(FinalName)
+	NewScriptButton.MouseButton1Down:Connect(function()
+		local Preessed = false
+		local c
+		local b;b = NewScriptButton.MouseButton1Up:Connect(function()
+			Delta:OpenScript(FinalName)
+			Preessed = true
+			c:Disconnect()
+			b:Disconnect()
+		end)
+		c = UserInputService.InputEnded:Connect(function(input)
+			if input == Enum.UserInputType.MouseButton1 or input == Enum.UserInputType.Touch then
+				b:Disconnect()
+				c:Disconnect()
+			end
+		end)
+		
+		task.delay(1,function()
+			if not Preessed then
+				b:Disconnect()
+				c:Disconnect()
+				NewScriptButton.TextTransparency = 1
+				
+				local TextBox = NewScriptButton.TextBox
+				TextBox.Visible = true
+				TextBox:CaptureFocus()
+			end
+		end)
 	end)
 	
+	NewScriptButton.TextBox:GetPropertyChangedSignal("Text"):Connect(function()
+		NewScriptButton.Text = NewScriptButton.TextBox.Text
+	end)
+
+	NewScriptButton.TextBox.FocusLost:Connect(function()
+		NewScriptButton.TextBox.Visible = false
+		
+		local OldScript = Delta.Scripts[FinalName]
+		
+		Delta.Scripts[FinalName] = nil
+		
+		Delta.Scripts[GetScriptName(NewScriptButton.TextBox.Text)] = OldScript
+		NewScriptButton.Text = NewScriptButton.TextBox.Text
+		NewScriptButton.TextTransparency = 0
+	end)
+
 	Delta.Scripts[FinalName] = {
 		Source = scr,
 		Button = NewScriptButton
@@ -377,11 +451,13 @@ end
 
 
 function Delta:AddConsoleMessage(Side, Message, MessageType)
+	Delta.SmallConsole:AddConsoleMessage(Side,Message,MessageType)
+	
 	local t = os.date("*t")
 	local str = string.format("%02d:%02d:%02d", t.hour, t.min, t.sec)
 
 	local Text = tostring(Message)
-	local NewText: TextLabel = ConsoleUi:FindFirstChild(Side).UIListLayout.TextLabel:Clone()
+	local NewText = ConsoleUi:FindFirstChild(Side).UIListLayout.TextLabel:Clone()
 
 	NewText.RichText = true
 	NewText.Text = string.format('<font color="#FFFFFF">[%s]</font> %s', str, Text)
@@ -469,6 +545,8 @@ function Delta:Init()
 	local OldText = ""
 	
 	CodeInput:GetPropertyChangedSignal("Text"):Connect(function()
+		if not Delta.Settings.CurrentSettings.CodeHighlight then return end
+		
 		local Text = CodeInput.Text
 
 		if Text == OldText then return end
@@ -493,10 +571,6 @@ function Delta:Init()
 		Delta.CurrentScript.Source = Text
 	end)
 	
-	local Completion = RunService:IsStudio() and require(script.CompletionModule) or loadstring(readfile("CompletionModule"))()
-
-	Completion.bind(CodeInput,{})
-	
 	CodeFrame.ScrollingFrame:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
 		CodeFrame.Line.CanvasPosition = CodeFrame.ScrollingFrame.CanvasPosition
 	end)
@@ -518,6 +592,9 @@ function Delta:Init()
 		local Name = Delta.CurrentScript.Button.Name
 		writefile(`SavedScripts/{Name}`,Delta.CurrentScript.Source)
 		Delta:RefreshSavedScript()
+	end)
+	Buttons.Console.MouseButton1Click:Connect(function()
+		Delta.Ui.SmallConsole.Visible = not Delta.Ui.SmallConsole.Visible
 	end)
 	
 	local SavedUi = Delta.Ui.ContentIsland.Main.saved
@@ -557,6 +634,22 @@ function Delta:Init()
 	AutoScroll(ConsoleUi.Roblox)
 	AutoScroll(ConsoleUi.Delta)
 	
+	ConsoleUi.DeltaTitle.TextButton.MouseButton1Click:Connect(function()
+		for i,v in ConsoleUi.Delta:GetChildren() do
+			if v:IsA("TextLabel") then
+				v:Destroy()
+			end
+		end
+	end)
+	
+	ConsoleUi.RobloxTitle.TextButton.MouseButton1Click:Connect(function()
+		for i,v in ConsoleUi.Roblox:GetChildren() do
+			if v:IsA("TextLabel") then
+				v:Destroy()
+			end
+		end
+	end)
+	
 	if not RunService:IsStudio() then
 		Delta:RefreshSavedScript()
 	end
@@ -567,11 +660,19 @@ function Delta:Init()
 	
 	if RunService:IsStudio() then
 		getfenv().print = function(...)
-			Delta:AddConsoleMessage("Delta",table.concat({...}," "),Enum.MessageType.MessageOutput)
+			local args = {...}
+			for i,v in args do
+				args[i] = tostring(v)
+			end
+			Delta:AddConsoleMessage("Delta",table.concat(args," "),Enum.MessageType.MessageOutput)
 			return oldprint(...)
 		end
 		getfenv().warn = function(...)
-			Delta:AddConsoleMessage("Delta",table.concat({...}," "),Enum.MessageType.MessageWarning)
+			local args = {...}
+			for i,v in args do
+				args[i] = tostring(v)
+			end
+			Delta:AddConsoleMessage("Delta",table.concat(args," "),Enum.MessageType.MessageWarning)
 			return oldwarn(...)
 		end
 		getfenv().error = function(Message,level)
@@ -636,13 +737,707 @@ function Delta:Init()
 		end
 	end
 	
+	local Completion = RunService:IsStudio() and require(script.CompletionModule) or loadstring(readfile("CompletionModule"))()
+	
 	Delta:CloseUi()
+	Delta:TogglePage("code")
+
+	local CurrentCompletion
+	
+	local SettingsFolder = "Delta(Obi_xieO)/Settings/"
+	
+
+	if not RunService:IsStudio() then
+		setfflag("TaskSchedulerLimitTargetFpsTo2402","False")
+		setfflag("GameBasicSettingsFramerateCap5","False")
+		
+		if not isfolder("Delta(Obi_xieO)/Settings") then
+			makefolder("Delta(Obi_xieO)/Settings")
+		end
+	end
+	
+	local OldSettings = table.clone(Delta.Settings.CurrentSettings)
+	
+	local function UpdateSettings()
+		local NeedToUpdate = {}
+		
+		for i,v in Delta.Settings.CurrentSettings do
+			if OldSettings[i] == v then
+				continue
+			end
+			NeedToUpdate[i] = v
+		end
+		
+		OldSettings = table.clone(Delta.Settings.CurrentSettings)
+		
+		if not next(NeedToUpdate) then return end
+		
+		for i,v in NeedToUpdate do
+			local Path = SettingsFolder..i
+			
+			if RunService:IsStudio() then
+				warn("设置更改: ",Path,HttpService:JSONEncode(v))
+				continue
+			end
+			writefile(Path,HttpService:JSONEncode(v))
+		end
+	end
+	
+	local function GetSettings()
+		if RunService:IsStudio() then return end
+		local Settings = listfiles("Delta(Obi_xieO)/Settings")
+		for i,v in Settings do
+			local Data = readfile(v)
+			if Data == "" then continue end
+			local SettingName = string.sub(v,#SettingsFolder+1)
+			
+			Delta.Settings.CurrentSettings[SettingName] = HttpService:JSONDecode(Data)
+		end
+	end
+	
+	Delta.Settings.CurrentSettings = {
+		CodeCompletion = true,
+		CodeHighlight = true,
+		Fpscap = 60,
+		CurrentNavIslandPosition = {"Top"},
+	}
+	
+	GetSettings()
+
+	Delta.Settings:AddToggle({
+		Name = "代码补全",
+		Text = "仅限pc端，长代码性能不佳",
+		Value = Delta.Settings.CurrentSettings.CodeCompletion,
+	},function(Value)
+		Delta.Settings.CurrentSettings.CodeCompletion = Value
+		if Value then
+			CurrentCompletion = Completion.bind(CodeInput,{})
+		elseif CurrentCompletion then
+			CurrentCompletion:unbind()
+		end
+		
+		UpdateSettings()
+	end)
+	Delta.Settings:AddToggle({
+		Name = "语法高亮",
+		Text = "推荐开启，性能影响不大",
+		Value = Delta.Settings.CurrentSettings.CodeHighlight,
+	},function(Value)
+		Delta.Settings.CurrentSettings.CodeHighlight = Value
+		if Value then
+			CodeFrame.ScrollingFrame.TextLabel.Visible = true
+		else
+			CodeFrame.ScrollingFrame.TextLabel.Visible = false
+		end
+
+		UpdateSettings()
+	end)
+	
+	Delta.Settings:AddDropdown({
+		Name = "菜单位置",
+		Options = {
+			"Top",
+			"Bottom",
+			"Right",
+		},
+		CurrentOptions = Delta.Settings.CurrentSettings.CurrentNavIslandPosition
+	},function(Options)
+		Delta.Settings.CurrentSettings.CurrentNavIslandPosition = Options
+		
+		if Delta.Openned then
+			local CurrentConfig = Delta.NavIslandPositions[Delta.Settings.CurrentSettings.CurrentNavIslandPosition[1]]
+
+			Tween(Delta.Ui.NavIsland,{.1},{
+				Size = CurrentConfig.Size or UDim2.fromOffset(320,44),
+				Position = CurrentConfig.Position
+			})
+			Delta.Ui.NavIsland.Buttons.UIListLayout.FillDirection = CurrentConfig.Vertical and Enum.FillDirection.Vertical or Enum.FillDirection.Horizontal
+		end
+		
+		UpdateSettings()
+	end)
+	
+	Delta.Settings:AddNumber({
+		Name = "帧率上限",
+		Text = "设置Roblox帧率上限",
+		Value = Delta.Settings.CurrentSettings.Fpscap,
+		Min = 0,
+		Max = math.huge,
+		Step = 10,
+	},function(Number)
+		Delta.Settings.CurrentSettings.Fpscap = Number
+		UpdateSettings()
+		if RunService:IsStudio() then
+			return
+		end
+		
+		setfflag("TaskSchedulerTargetFps",Number)
+	end)
+	
+	local FOV = 0
+	
+	Delta.Settings:AddNumber({
+		Name = "Fov锁定（部分游戏可能有检测，0为禁用，默认0且不保存）",
+		Text = "设置fov",
+		Value = FOV,
+		Min = 0,
+		Max = 1000,
+		Step = 1,
+	},function(Number)
+		FOV = Number
+	end)
+	
+	Delta.Settings:AddToggle({
+		Name = "启用忍者ui",
+	},function(Value)
+		for i,v in Delta.DeltaUi do
+			v.Enabled = Value
+		end
+	end)
+	
+	Delta.Settings:AddButton({
+		Name = "快速换服",
+	},function()
+		local placeId = game.PlaceId
+		local jobId = game.JobId
+		
+		local function fetchServers()
+			local all = {}
+			local cursor = ""
+			for _ = 1, 10 do
+				local url = "https://games.roblox.com/v1/games/"
+					.. placeId .. "/servers/Public?sortOrder=Asc&limit=100"
+				if cursor ~= "" and cursor ~= "null" then
+					url = url .. "&cursor=" .. cursor
+				end
+				local ok, body = pcall(function()
+					return HttpService:JSONDecode(game:HttpGet(url))
+				end)
+				if not ok or not body or not body.data then break end
+				for _, srv in ipairs(body.data) do
+					if srv.playing < srv.maxPlayers then
+						table.insert(all, srv)
+					end
+				end
+				cursor = body.nextPageCursor
+				if not cursor or cursor == "null" then break end
+				task.wait()
+			end
+			table.sort(all, function(a, b)
+				return (a.ping or 9999) < (b.ping or 9999)
+			end)
+			return all
+		end
+
+		while true do
+			local ok, servers = pcall(fetchServers)
+			if ok then
+				for _, srv in ipairs(servers) do
+					local id = tostring(srv.id)
+					if id ~= tostring(jobId) then
+						local hopOk = pcall(function()
+							TeleportService:TeleportToPlaceInstance(
+								placeId, id, Players.LocalPlayer
+							)
+						end)
+						if hopOk then return end
+					end
+				end
+			end
+			task.wait(3)
+		end
+	end)
+	
+	local MessageFrame = Delta.Ui.ContentIsland.Main.settings.SomeMessage
+	
+	MessageFrame.PlaceId.Text = `PlaceId : {game.PlaceId}`
+	
+	local ti = tick()
+	RunService.RenderStepped:Connect(function(dt)
+		if tick() - ti > 0.5 then
+			ti = tick()
+			
+			MessageFrame.FPS.Text = `FPS : {math.floor(1/dt)}`
+			MessageFrame.PING.Text = `Ping : {math.floor(Player:GetNetworkPing()*100000)/100}ms`
+		end
+		
+		if FOV and FOV ~= 0 then
+			workspace.CurrentCamera.FieldOfView = FOV
+		end
+	end)
 	
 	Delta:AddScript("Script",DefaultScript)
 	Delta:OpenScript("Script")
+	
+	for i,v in Delta.DeltaUi do
+		v.Enabled = false
+	end
 end
 
+local SmallConsole = {
+	Ui = Delta.Ui.SmallConsole
+}
+Delta.SmallConsole = SmallConsole
 
+function SmallConsole:AddConsoleMessage(Side,Message,MessageType)
+	local t = os.date("*t")
+	local str = string.format("%02d:%02d:%02d", t.hour, t.min, t.sec)
+
+	local Text = tostring(Message)
+	local NewText = SmallConsole.Ui.ConsoleText:Clone()
+
+	NewText.RichText = true
+	NewText.Text = string.format('<font color="#FFFFFF">[%s]</font> %s', str, Text)
+	NewText.TextSize = 12
+
+	NewText.TextColor3 =
+		(MessageType == Enum.MessageType.MessageError   and Color3.fromRGB(231, 87, 80))  or
+		(MessageType == Enum.MessageType.MessageWarning and Color3.fromRGB(245, 118, 48)) or
+		(MessageType == Enum.MessageType.MessageInfo    and Color3.fromRGB(107, 180, 255)) or
+		Color3.fromRGB(255, 255, 255)
+
+	if (MessageType == Enum.MessageType.MessageError) or (MessageType == Enum.MessageType.MessageWarning) then
+		local n = NewText.FontFace
+		n.Weight = Enum.FontWeight.ExtraBold
+		NewText.FontFace = n
+	end
+
+	NewText.Parent = SmallConsole.Ui:FindFirstChild(Side)
+end
+
+for i,v in SmallConsole.Ui.Frame.Buttons:GetChildren() do
+	if v:IsA("TextButton") then
+		local Page = SmallConsole.Ui:FindFirstChild(v.Name)
+		
+		v.MouseButton1Click:Connect(function()
+			for i,n in SmallConsole.Ui.Frame.Buttons:GetChildren() do
+				if n:IsA("TextButton") then
+					Tween(n,{.1},{
+						BackgroundColor3 = n == v and Color3.fromRGB(120, 180, 255) or Color3.fromRGB(28, 32, 46)
+					})
+					
+					Tween(n.UIStroke,{.1},{
+						Transparency = n == v and 0.2 or 0.7
+					})
+					
+					SmallConsole.Ui:FindFirstChild(n.Name).Visible = n == v
+				end
+			end
+		end)
+		
+		SmallConsole.Ui.Frame.Clear.MouseButton1Click:Connect(function()
+			for i,v in Page:GetChildren() do
+				if v:IsA("TextLabel") then
+					v:Destroy()
+				end
+			end
+		end)
+	end
+end
+
+Delta.Connections.ConsoleDrag = SmallConsole.Ui.Frame.InputBegan:Connect(function(input)
+	if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then return end
+	local MousePos = UserInputService:GetMouseLocation()
+	local ViewportSize = workspace.CurrentCamera.ViewportSize
+
+	local Offset = Vector2.new(
+		MousePos.X / ViewportSize.X - SmallConsole.Ui.Position.X.Scale,
+		MousePos.Y / ViewportSize.Y - SmallConsole.Ui.Position.Y.Scale
+	)
+
+	local R = RunService.RenderStepped:Connect(function()
+		local MousePos = UserInputService:GetMouseLocation()
+		local ViewportSize = workspace.CurrentCamera.ViewportSize
+
+		local TargetX = MousePos.X / ViewportSize.X - Offset.X
+		local TargetY = MousePos.Y / ViewportSize.Y - Offset.Y
+
+		local FinalPosition = UDim2.new(TargetX, 0, TargetY, 0)
+
+		Tween(SmallConsole.Ui, {0.1}, {
+			Position = FinalPosition
+		})
+	end)
+
+	local Release
+	Release = UserInputService.InputEnded:Connect(function(Input)
+		if Input.UserInputType == Enum.UserInputType.MouseButton1
+			or Input.UserInputType == Enum.UserInputType.Touch then
+			R:Disconnect()
+			Release:Disconnect()
+		end
+	end)
+end)
+
+local Settings = {
+	Ui = Delta.Ui.ContentIsland.Main.settings,
+	CurrentSettings = {
+		
+	},
+}
+Delta.Settings = Settings
+Delta.DropdownConnections = {}
+
+function Settings:AddButton(Info,CallBack)
+	Info = {
+		Name = Info.Name or "Button",
+		Text = Info.Text,
+	}
+	
+	local NewButton = Settings.Ui.UIListLayout.Button:Clone()
+	
+	function Info:Set()
+		NewButton.TextLabel.Text = self.Name
+		if self.Text then
+			NewButton.SubText.Text = self.Text
+			NewButton.SubText.Visible = true
+		end
+	end
+	
+	Info.Set(Info)
+	
+	NewButton.Parent = Settings.Ui
+	
+	NewButton.TextButton.MouseButton1Click:Connect(function()
+		CallBack()
+	end)
+	
+	return Info
+end
+
+local Dropdown = Delta.Ui.Dropdown
+
+function Settings:AddDropdown(Info, Callback)
+	if Info.CurrentOptions then
+		task.spawn(function()
+			Callback(Info.CurrentOptions,Info.CurrentOptions[1])
+		end)
+	end
+	
+	Info = {
+		Name           = Info.Name or "Dropdown",
+		Text           = Info.Text,
+		Options        = Info.Options or {},
+		CurrentOptions = table.clone(Info.CurrentOptions or {}),
+		MultSelect     = Info.MultSelect or false,
+		CanNone        = Info.CanNone or false,
+	}
+
+	local T = {
+		bg      = Color3.fromRGB(30, 34, 48),
+		bgDark  = Color3.fromRGB(20, 22, 32),
+		text    = Color3.fromRGB(240, 244, 255),
+		subtext = Color3.fromRGB(150, 160, 190),
+		accent  = Color3.fromRGB(120, 180, 255),
+	}
+
+	local NewDropdown = Settings.Ui.UIListLayout.Dropdown:Clone()
+	
+	local TriggerBtn = NewDropdown.TextButton
+	local Panel      = Dropdown.Dropdown.Panel
+	local Scroll     = Panel.Scroll
+	local Template   = Scroll.UIListLayout.Item
+	
+	local Buttons      = {}
+	local IsOpen       = false
+
+	TriggerBtn.AutoButtonColor = true
+	
+	local function contains(t, v)
+		for _, x in ipairs(t) do if x == v then return true end end
+		return false
+	end
+	
+	local function UpdateTriggerText()
+		local cur = Info.CurrentOptions
+		if #cur == 0 then
+			TriggerBtn.Value.Text = "请选择..."
+			TriggerBtn.Value.TextColor3 = T.subtext
+		else
+			TriggerBtn.Value.Text = table.concat(cur, ", ")
+			TriggerBtn.Value.TextColor3 = T.text
+		end
+	end
+
+	local function SetSelectedVisual(btn, on)
+		Tween(btn, {.1}, {
+			BackgroundTransparency = on and .7 or 1,
+			BackgroundColor3       = on and T.accent or T.bg,
+		})
+		
+		local frame = btn:FindFirstChild("Frame")
+		if frame then
+			if on then
+				frame.Visible = true
+				Tween(frame, {.1}, { BackgroundTransparency = 0 })
+			else
+				Tween(frame, {.1}, { BackgroundTransparency = 1 })
+				task.delay(.1, function()
+					if not contains(Info.CurrentOptions, btn:GetAttribute("Value")) then
+						frame.Visible = false
+					end
+				end)
+			end
+		end
+	end
+	
+	local function ApplySelection(v)
+		if Info.MultSelect then
+			if contains(Info.CurrentOptions, v) then
+				if #Info.CurrentOptions == 1 and not Info.CanNone then
+					return
+				end
+				for i, x in ipairs(Info.CurrentOptions) do
+					if x == v then
+						table.remove(Info.CurrentOptions, i)
+						break
+					end
+				end
+			else
+				table.insert(Info.CurrentOptions, v)
+			end
+		else
+			if #Info.CurrentOptions == 1 and Info.CurrentOptions[1] == v then
+				if Info.CanNone then
+					Info.CurrentOptions = {}
+				else
+					return
+				end
+			else
+				Info.CurrentOptions = { v }
+			end
+		end
+
+		local Ordered = {}
+		for _, opt in ipairs(Info.Options) do
+			if contains(Info.CurrentOptions, opt) then
+				table.insert(Ordered, opt)
+			end
+		end
+		Info.CurrentOptions = Ordered
+		
+		for val, btn in pairs(Buttons) do
+			SetSelectedVisual(btn, contains(Info.CurrentOptions, val))
+		end
+		UpdateTriggerText()
+
+		if Callback then
+			task.spawn(function()
+				Callback(Info.CurrentOptions, Info.CurrentOptions[1])
+			end)
+		end
+	end
+	
+	local function NewButton(v)
+		local item = Template:Clone()
+		item.Label.Text = tostring(v)
+		item:SetAttribute("Value", v)
+		item.Visible = true
+
+		local isSel = contains(Info.CurrentOptions, v)
+		item.BackgroundTransparency = isSel and .7 or 1
+		item.BackgroundColor3       = isSel and T.accent or T.bg
+		local frame = item:FindFirstChild("Frame")
+		if frame then frame.Visible = isSel; frame.BackgroundTransparency = isSel and 0 or 1 end
+
+		item.MouseEnter:Connect(function()
+			if not contains(Info.CurrentOptions, v) then
+				Tween(item, {.1}, { BackgroundTransparency = .5 })
+			end
+		end)
+		item.MouseLeave:Connect(function()
+			if contains(Info.CurrentOptions, v) then
+				Tween(item, {.1}, { BackgroundTransparency = .7 })
+			else
+				Tween(item, {.1}, { BackgroundTransparency = 1 })
+			end
+		end)
+
+		item.TextButton.MouseButton1Click:Connect(function()
+			ApplySelection(v)
+		end)
+
+		item.Parent = Scroll
+		Buttons[v] = item
+		return item
+	end
+	
+	local function Refresh()
+		UpdateTriggerText()
+		if not IsOpen then return end
+		
+		for _, btn in pairs(Buttons) do btn:Destroy() end
+		Buttons = {}
+		for _, v in ipairs(Info.Options) do
+			NewButton(v)
+		end
+	end
+	
+	local SetOpen
+	SetOpen = function(open)
+		if Settings.DropdownRunning then return end
+		Settings.DropdownRunning = true
+
+		IsOpen = open
+		
+		Refresh()
+		
+		local GuiInsert = GuiService:GetGuiInset()
+		local FinalPos = GetInScreenPosition(TriggerBtn.AbsolutePosition+GuiInsert,Dropdown.Dropdown.AbsoluteSize + Vector2.new(0,Dropdown.Dropdown.Panel.AbsoluteSize.Y + 10))
+
+		Dropdown.Dropdown.Position = UDim2.fromOffset(FinalPos.X,FinalPos.Y)
+		Dropdown.Visible = true
+		if open then
+			Panel.Size = UDim2.new(1, 0, 0, 0)
+		end
+
+		local targetH = open and 130 or 0
+
+		Tween(Panel, {.18}, { Size = UDim2.new(1, 0, 0, targetH) })
+
+		task.delay(.2, function()
+			if not open then
+				Dropdown.Visible = false
+
+				for i,v in Dropdown.Dropdown.Panel.Scroll:GetChildren() do
+					if v:IsA("Frame") then
+						v:Destroy()
+					end
+				end
+			end
+
+			Settings.DropdownRunning = false
+		end)
+
+		local arrow = TriggerBtn:FindFirstChild("Arrow")
+		if arrow then
+			Tween(arrow, {.18}, { Rotation = open and 0 or -90 })
+		end
+
+		local a;a = Dropdown.MouseButton1Click:Connect(function()
+			if Settings.DropdownRunning then return end
+			SetOpen(false)
+			a:Disconnect()
+		end)
+	end
+	
+	function Info:Set()
+		NewDropdown.TextLabel.Text = self.Name
+
+		if self.Text then
+			NewDropdown.SubText.Text = self.Text
+			NewDropdown.SubText.Visible = true
+		end
+		
+		Info = self
+		
+		Refresh()
+	end
+
+	TriggerBtn.MouseButton1Click:Connect(function()
+		SetOpen(not IsOpen)
+	end)
+
+	NewDropdown.Parent = Settings.Ui
+
+	Info.Refresh = Refresh
+	Info:Set()
+	
+	return Info
+end
+
+function Settings:AddToggle(Info,Callback)
+	Info = {
+		Name = Info.Name or "Toggle",
+		Text = Info.Text,
+		Value = Info.Value or false,
+	}
+	
+	local NewToggle = Settings.Ui.UIListLayout.Toggle:Clone()
+	
+	
+	function Info:Set()
+		NewToggle.TextLabel.Text = self.Name
+		if self.Text then
+			NewToggle.SubText.Text = self.Text
+			NewToggle.SubText.Visible = true
+		end
+		
+		Tween(NewToggle.Frame,{.1},{
+			BackgroundColor3 = self.Value and Color3.fromRGB(130, 255, 180) or Color3.fromRGB(255, 130, 180),
+		})
+		Tween(NewToggle.Frame.Frame,{.1},{
+			Position = self.Value and UDim2.new(1,-3,0.5,0) or UDim2.new(0,3,0.5,0),
+			AnchorPoint = self.Value and Vector2.new(1,0.5) or Vector2.new(0,0.5)
+		})
+
+		if not Callback then return end
+		Callback(self.Value)
+	end
+	
+	Info:Set()
+	
+	NewToggle.Parent = Settings.Ui
+	NewToggle.Frame.TextButton.MouseButton1Click:Connect(function()
+		Info.Value = not Info.Value
+		Info:Set()
+	end)
+	
+	return Info
+end
+
+function Settings:AddNumber(Info,Callback)
+	Info = {
+		Name = Info.Name or "Number",
+		Text = Info.Text,
+		Value = Info.Value or 0,
+		Min = Info.Min or 0,
+		Max = Info.Max or math.huge,
+		Step = Info.Step or 1,
+	}
+	
+	local NewNumber = Settings.Ui.UIListLayout.Number:Clone()
+	
+	function Info:Set()
+		NewNumber.TextLabel.Text = Info.Name
+		if Info.Text then
+			NewNumber.SubText.Text = Info.Text
+			NewNumber.SubText.Visible = true
+		end
+		
+		NewNumber.TextBox.Text = tostring(Info.Value)
+		
+		if Callback then
+			Callback(Info.Value)
+		end
+	end
+	
+	Info:Set()
+	
+	NewNumber.Add.MouseButton1Click:Connect(function()
+		if math.min(Info.Value + Info.Step,Info.Max) == Info.Value then return end
+		Info.Value = math.min(Info.Value + Info.Step,Info.Max)
+		Info:Set()
+	end)
+	NewNumber:FindFirstChild("Remove").MouseButton1Click:Connect(function()
+		if math.max(Info.Value - Info.Step,Info.Min) == Info.Value then return end
+		Info.Value = math.max(Info.Value - Info.Step,Info.Min)
+		Info:Set()
+	end)
+	NewNumber.TextBox.FocusLost:Connect(function()
+		if Info.Value == tonumber(NewNumber.TextBox.Text) or not tonumber(NewNumber.TextBox.Text) then
+			NewNumber.TextBox.Text = tostring(Info.Value)
+			return
+		end
+		
+		Info.Value = math.clamp(tonumber(NewNumber.TextBox.Text),Info.Min,Info.Max)
+		Info:Set()
+	end)
+	
+	NewNumber.Parent = Settings.Ui
+	
+	return Info
+end
 
 --[[
     API:
