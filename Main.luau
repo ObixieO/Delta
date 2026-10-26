@@ -971,7 +971,7 @@ function Delta:Init()
 		Create("ImageLabel",{
 			Name = "Logo",
 			Parent = Delta.Ui.NavIsland,
-			Image = Delta.DeltaUi.Logo.Image,
+			Image = Delta.DeltaUi.Logo:FindFirstChildOfClass("ImageLabel").Image,
 			Size = UDim2.new(1,1),
 			BackgroundTransparency = 1,
 			ScaleType = Enum.ScaleType.Fit
