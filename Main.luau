@@ -589,7 +589,7 @@ function Delta:Init()
 	else
 		ScriptContext.Error:Connect(function(message, stackTrace, Tscript)
 			local scriptName = Tscript and Tscript:GetFullName() or "Unknown"
-			if Tscript == script or (Tscript.Parent == nil and Tscript.Name == "LocalScript") then
+			if not Tscript then
 				Delta:AddConsoleMessage("Delta", message, Enum.MessageType.MessageError)
 
 				if stackTrace and stackTrace ~= "" then
