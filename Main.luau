@@ -972,7 +972,7 @@ function Delta:Init()
 			Name = "Logo",
 			Parent = Delta.Ui.NavIsland,
 			Image = Delta.DeltaUi.Logo:FindFirstChildOfClass("ImageButton").Image,
-			Size = UDim2.new(1,1),
+			Size = UDim2.fromScale(1,1),
 			BackgroundTransparency = 1,
 			ScaleType = Enum.ScaleType.Fit
 		})
