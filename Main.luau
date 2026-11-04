@@ -3423,14 +3423,13 @@ do
 							Remote:IsA("RemoteFunction")
 						) then
 					
-					local returnvalue = NameCall(self, table.unpack(args))
+					local returnvalue = NameCall(...)
 					
 					pcall(Rspy.Log,self,method,args,returnvalue)
 
 					return returnvalue
 				elseif method == "httpget" and self.ClassName == "DataModel" then
-					local args = {...}
-					local returnvalue = NameCall(self, table.unpack(args))
+					local returnvalue = NameCall(...)
 					
 					pcall(Rspy.Log,self,"httpget",args,returnvalue)
 					
