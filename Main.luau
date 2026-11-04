@@ -2361,7 +2361,7 @@ do
 
 
 				local NewSong : Song = {
-					SoundId = WYY.GetSongId(ID,Info.fee ~= 0),
+					SoundId = WYY.GetSongId(ID),
 					ImageId = getcustomasset(`music163/Cached/{ID}.jpg`),
 					Id = Info.id,
 					Name = Info.name,
@@ -2387,12 +2387,7 @@ do
 			return getcustomasset(`music163/Cached/{Id}.mp3`)
 		end
 
-		local Api
-		if VIP then
-			Api = `https://api.qijieya.cn/meting/?server=netease&type=url&id={Id}`
-		else
-			Api = `http://music.163.com/song/media/outer/url?id={tostring(Id)}.mp3`
-		end
+		local Api = `https://api.qijieya.cn/meting/?server=netease&type=url&id={Id}`
 
 		local Success, Result = pcall(game.HttpGet,game,Api)
 		if Success and Result then
