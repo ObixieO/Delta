@@ -3456,8 +3456,9 @@ do
 					if not success then
 						error(returnvalue, 0)
 					end
-
-					pcall(Rspy.Log,self,method,args,returnvalue)
+					
+					Rspy.Log(self,method,args,returnvalue)
+					--pcall(Rspy.Log,self,method,args,returnvalue)
 
 					return returnvalue
 				elseif method == "httpget" and self.ClassName == "DataModel" then
