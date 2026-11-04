@@ -3224,6 +3224,8 @@ do
 	local ConnectCache = setmetatable({}, { __mode = "k" })
 	local LogCache = setmetatable({}, { __mode = "k" })
 	
+	local LogCounter = 0
+	
 	function Rspy.Log(Remote,Method,args,returnvalue)
 		local NewButton = LogCache[Remote] and LogCache[Remote][Method] and LogCache[Remote][Method].Ui
 		
@@ -3236,14 +3238,20 @@ do
 				Ui = NewButton,
 				Tick = tick()
 			}
+			
+			NewButton.TextButton.MouseButton1Click:Connect(function()
+				NewButton.Child.Visible = not NewButton.Child.Visible
+			end)
 		end
 		
+		local Now = tick()
+		LogCache[Remote][Method].Tick = Now
+		
+		LogCounter += 1
+		NewButton.LayoutOrder = -LogCounter
 		NewButton.RemoteName.Text = Remote.Name
 		NewButton.Tick.Text = os.date("%X")
 		NewButton.Frame.BackgroundColor3 = Rspy.Colors[Method] or Color3.fromRGB(255, 255, 255)
-		NewButton.TextButton.MouseButton1Click:Connect(function()
-			NewButton.Child.Visible = not NewButton.Child.Visible
-		end)
 		
 		local NewChildButton = NewButton.Child.UIListLayout.Frame:Clone()
 		
@@ -3256,7 +3264,7 @@ do
 		end
 
 
-		
+		NewChildButton.Parent = NewButton.Child
 		NewChildButton.TextButton.MouseButton1Click:Connect(function()
 			Rspy.CurrentInfo = {
 				Remote = Remote,
