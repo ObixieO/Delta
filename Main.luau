@@ -3414,16 +3414,16 @@ do
 			local self = (...)
 			
 			if method and self and typeof(self) == "Instance" then
-				--[[if (
+				if (
 					method == "fireserver" and 
 						(
-							IsA(self,"RemoteEvent") or 
-							IsA(self,"UnreliableRemoteEvent")
+							self.ClassName == "RemoteEvent" or 
+							self.ClassName == "UnreliableRemoteEvent"
 						)
 					) or 
 						(
 							method == "invokeserver" and 
-							IsA(self,"RemoteFunction")
+							self.ClassName == "RemoteFunction"
 						) then
 					
 					local returnvalue = NameCall(...)
@@ -3431,7 +3431,7 @@ do
 					pcall(Rspy.Log,self,method,args,returnvalue)
 
 					return returnvalue
-				else]]if method == "httpget" and self.ClassName == "DataModel" then
+				elseif method == "httpget" and self.ClassName == "DataModel" then
 					local returnvalue = NameCall(...)
 					
 					pcall(Rspy.Log,self,"httpget",args,returnvalue)
