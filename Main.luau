@@ -1055,7 +1055,11 @@ function Delta:Init()
 	if not RunService:IsStudio() then
 		for i,v in Delta.Misc do
 			if v.Init then
-				v.Init()
+				task.spawn(function()
+					xpcall(v.Init,function(m)
+						warn("Error: ",debug.traceback(m))
+					end)
+				end)
 			end
 		end
 	end
@@ -3029,7 +3033,10 @@ do
 	Delta.Misc["Rspy"] = Rspy
 	
 	if not RunService:IsStudio() then
-		LazyFix = getgenv().LazyFix or loadstring(game:HttpGet("https://raw.githubusercontent.com/qian-cheng-awa/Tools/refs/heads/main/TableToLua.lua"))()
+		if not isfile("LazyFix") then
+			writefile("LazyFix",game:HttpGet("https://raw.githubusercontent.com/qian-cheng-awa/Tools/refs/heads/main/TableToLua.lua"))
+		end
+		LazyFix = getgenv().LazyFix or loadstring(readfile("LazyFix"))()
 		getgenv().LazyFix = LazyFix
 	end
 	
@@ -3163,7 +3170,7 @@ do
 		
 		local str = `local args = {Rspy.TableToString(CurrentInfo.Args)}`
 		str = str .. "\n\n"
-		str = str .. string.format(Rspy.Methods[CurrentInfo.Method], Rspy.GetPath(CurrentInfo.Remote))
+		str = str .. string.format(Rspy.Methods[CurrentInfo.Method], Rspy.GetPath(CurrentInfo.Remote) or "")
 		
 		Rspy.CodeBox:setRaw(str)
 	end
@@ -3359,6 +3366,13 @@ do
 					pcall(Rspy.Log,self,method,args,returnvalue)
 
 					return returnvalue
+				elseif method == "httpget" and self.ClassName == "DataModel" then
+					local args = {...}
+					local returnvalue = NameCall(self, table.unpack(args))
+					
+					pcall(Rspy.Log,self,"httpget",args,returnvalue)
+					
+					return returnvalue
 				end
 			end
 			
@@ -3376,6 +3390,26 @@ do
 			end
 
 			return NewIndex(...)
+		end)
+		
+		local HttpGetH;HttpGetH = othhook(game.HttpGet, function(self, ...)
+			local args = {...}
+			
+			local ReturnValue = HttpGetH(self, ...)
+			
+			pcall(Rspy.Log, self, "httpget", args, ReturnValue)
+			
+			return ReturnValue
+		end)
+		
+		local requestH;requestH = othhook(request, function(...)
+			local args = {...}
+			
+			local ReturnValue = requestH(...)
+			
+			pcall(Rspy.Log, nil, "request", args, ReturnValue)
+			
+			return ReturnValue
 		end)
 		
 		local function RegisterSignal(Instance)
