@@ -3039,6 +3039,7 @@ do
 		LazyFix = getgenv().LazyFix or loadstring(readfile("LazyFix"))()
 		getgenv().LazyFix = LazyFix
 	end
+
 	
 	function Rspy.TableToString(table)
 		return LazyFix.Convert(table, true)
@@ -3219,22 +3220,44 @@ do
 		httpget = "HttpGet",
 	}
 	
+	local CallbackOwners = setmetatable({}, { __mode = "k" })
+	local ConnectCache = setmetatable({}, { __mode = "k" })
+	local LogCache = setmetatable({}, { __mode = "k" })
+	
 	function Rspy.Log(Remote,Method,args,returnvalue)
-		local NewButton = RspyUI.List.ScrollingFrame.UIListLayout.TextButton:Clone()
+		local NewButton = LogCache[Remote] and LogCache[Remote][Method] and LogCache[Remote][Method].Ui
+		
+		if not NewButton then
+			NewButton = RspyUI.List.ScrollingFrame.UIListLayout.Frame:Clone()
+			NewButton.Parent = RspyUI.List.ScrollingFrame
+			
+			LogCache[Remote] = LogCache[Remote] or {}
+			LogCache[Remote][Method] = {
+				Ui = NewButton,
+				Tick = tick()
+			}
+		end
 		
 		NewButton.RemoteName.Text = Remote.Name
 		NewButton.Tick.Text = os.date("%X")
-		
 		NewButton.Frame.BackgroundColor3 = Rspy.Colors[Method] or Color3.fromRGB(255, 255, 255)
+		NewButton.TextButton.MouseButton1Click:Connect(function()
+			NewButton.Child.Visible = not NewButton.Child.Visible
+		end)
+		
+		local NewChildButton = NewButton.Child.UIListLayout.Frame:Clone()
 		
 		local CallStack = {}
-		
+
 		for level = 2, 30 do
 			local s, n, f = debug.info(level, "snf")
 			if not s then break end
 			table.insert(CallStack, { s = s, n = n, f = f })
 		end
-		NewButton.MouseButton1Click:Connect(function()
+
+
+		
+		NewChildButton.TextButton.MouseButton1Click:Connect(function()
 			Rspy.CurrentInfo = {
 				Remote = Remote,
 				Method = Method,
@@ -3249,11 +3272,9 @@ do
 			Rspy.GenCode()
 		end)
 		
-		NewButton.Parent = RspyUI.List.ScrollingFrame
+	
 	end
 	
-	local CallbackOwners = setmetatable({}, { __mode = "k" })
-	local ConnectCache = setmetatable({}, { __mode = "k" })
 	
 	local function ResolveCallable(Value)
 		if typeof(Value) == "function" then
@@ -3341,6 +3362,19 @@ do
 		local InstanceRaw = getrawmetatable(game)
 		local tr = Instance.new("RemoteEvent")
 		local SignalRaw = getrawmetatable(tr.OnClientEvent)
+		
+		RspyUI.Main.Buttons.Code.MouseButton1Click:Connect(function()
+			Rspy.GenCode()
+		end)
+		RspyUI.Main.Buttons.Stack.MouseButton1Click:Connect(function()
+			Rspy.CallStack()
+		end)
+		RspyUI.Main.Buttons.ReturnValue.MouseButton1Click:Connect(function()
+			Rspy.ReturnValue()
+		end)
+		RspyUI.Main.Buttons.Copy.MouseButton1Click:Connect(function()
+			setclipboard(Rspy.CodeBox:getRaw())
+		end)
 		
 		local NameCall;NameCall = othhook(rawget(InstanceRaw,"__namecall"), function(self, ...)
 			local method = string.lower(getnamecallmethod() or "")
