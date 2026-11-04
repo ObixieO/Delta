@@ -2490,8 +2490,8 @@ do
 			WYYUI.Frame.Player.TextButton.Frame.Size = UDim2.fromScale(v,1)
 			WYYUI.Frame.Player.TextButton.Point.Position = UDim2.fromScale(v,.5)
 		end)
-		WYYUI.Sound:GetPropertyChangedSignal("IsPlaying"):Connect(function()
-			WYYUI.Frame.Player.Frame.TextButton.Text = WYYUI.Sound.IsPlaying and "II" or "▶"
+		WYYUI.Sound:GetPropertyChangedSignal("Playing"):Connect(function()
+			WYYUI.Frame.Player.Frame.TextButton.Text = WYYUI.Sound.Playing and "II" or "▶"
 		end)
 		WYYUI.Sound:GetPropertyChangedSignal("PlaybackSpeed"):Connect(function()
 			local v = WYYUI.Sound.PlaybackSpeed/3
@@ -2506,7 +2506,7 @@ do
 		end)
 		
 		RunService.RenderStepped:Connect(function(dt)
-			if WYYUI.Sound.IsPlaying then
+			if WYYUI.Sound.Playing then
 				WYYUI.Frame.Image.Frame.ImageLabel.Rotation += dt * 10
 			end
 		end)
@@ -2566,7 +2566,7 @@ do
 		WYYUI.Frame.Player.Frame.TextButton.MouseButton1Click:Connect(function()
 			if not WYY.PlayingSong then return end
 			
-			if WYYUI.Sound.IsPlaying then
+			if WYYUI.Sound.Playing then
 				WYYUI.Sound:Pause()
 			else
 				WYYUI.Sound:Resume()
@@ -2656,7 +2656,7 @@ do
 
 				WYYUI.Volume.Scroll.Frame.Size = UDim2.fromScale(ratioX,1)
 				WYYUI.Volume.Scroll.Point.Position = UDim2.fromScale(ratioX,.5)
-				WYYUI.Sound.Volume = math.floor(ratioX)
+				WYYUI.Sound.Volume = math.floor(ratioX*100)/100
 				WYYUI.Volume.CurrentVolume.Text = math.floor(ratioX * 100) .. "%"
 			end
 
@@ -2705,6 +2705,10 @@ do
 		end)
 		WYYUI.List.Buttons["队列"].MouseButton1Click:Connect(function()
 			WYY.ShowList(WYY.SongList)
+		end)
+		
+		WYYUI.Sound.Ended:Connect(function()
+			WYY.Play(WYY.PlayingSong.Id)
 		end)
 		
 		for i,v in WYY.Search("热歌",20,1) do
