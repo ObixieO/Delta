@@ -3247,6 +3247,10 @@ do
 			LogCache[Remote][Method] = targetcache
 		end
 		
+		if not targetcache then
+			return
+		end
+		
 		local NewButton = targetcache.Ui or RspyUI.List.ScrollingFrame.UIListLayout.Frame:Clone()
 		if not targetcache.Ui then
 			targetcache.Ui = NewButton
@@ -3257,7 +3261,7 @@ do
 		end
 		
 		local Now = tick()
-		LogCache[Remote][Method].Tick = Now
+		targetcache.Tick = Now
 		
 		LogCounter += 1
 		NewButton.LayoutOrder = -LogCounter
@@ -3451,7 +3455,7 @@ do
 		end)
 		
 		local HttpGetH;HttpGetH = othhook(game.HttpGet, function(self, ...)
-			local args = {select(2,...)}
+			local args = {...}
 			
 			local ReturnValue = HttpGetH(self, ...)
 			
