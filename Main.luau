@@ -2478,15 +2478,6 @@ do
 				WYY.TogglePage(WYY.CurrentPage)
 			end
 		end)
-		WYYUI.Sound:GetPropertyChangedSignal("TimePosition"):Connect(function()
-			WYYUI.Frame.Player.TextLabel.Text = `{fmtTime(WYYUI.Sound.TimePosition)}/{fmtTime(WYYUI.Sound.TimeLength)}`
-			
-			local tl = WYYUI.Sound.TimeLength
-			local v = (tl > 0) and math.clamp(WYYUI.Sound.TimePosition / tl, 0, 1) or 0
-			
-			WYYUI.Frame.Player.TextButton.Frame.Size = UDim2.fromScale(v,1)
-			WYYUI.Frame.Player.TextButton.Point.Position = UDim2.fromScale(v,.5)
-		end)
 		WYYUI.Sound:GetPropertyChangedSignal("Playing"):Connect(function()
 			WYYUI.Frame.Player.Frame.TextButton.Text = WYYUI.Sound.Playing and "II" or "▶"
 		end)
@@ -2506,6 +2497,14 @@ do
 			if WYYUI.Sound.Playing then
 				WYYUI.Frame.Image.Frame.ImageLabel.Rotation += dt * 10
 			end
+			
+			WYYUI.Frame.Player.TextLabel.Text = `{fmtTime(WYYUI.Sound.TimePosition)}/{fmtTime(WYYUI.Sound.TimeLength)}`
+
+			local tl = WYYUI.Sound.TimeLength
+			local v = (tl > 0) and math.clamp(WYYUI.Sound.TimePosition / tl, 0, 1) or 0
+
+			WYYUI.Frame.Player.TextButton.Frame.Size = UDim2.fromScale(v,1)
+			WYYUI.Frame.Player.TextButton.Point.Position = UDim2.fromScale(v,.5)
 		end)
 		
 		local btn = WYYUI.Frame.Player.TextButton
