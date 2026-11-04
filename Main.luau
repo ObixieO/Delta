@@ -3135,7 +3135,7 @@ do
 				break
 			end
 
-			local Siblings = Parent:GetChildren()
+			local Siblings = Parent.GetChildren(Parent)
 			local SameNameCount = 0
 			local MyIndex
 			for i, child in ipairs(Siblings) do
@@ -3226,6 +3226,8 @@ do
 	
 	local LogCounter = 0
 	
+	local Clone = game.Clone
+	
 	function Rspy.Log(Remote,Method,args,returnvalue)
 		local targetcache
 		
@@ -3251,7 +3253,7 @@ do
 			return
 		end
 		
-		local NewButton = targetcache.Ui or RspyUI.List.ScrollingFrame.UIListLayout.Frame:Clone()
+		local NewButton = targetcache.Ui or Clone(RspyUI.List.ScrollingFrame.UIListLayout.Frame)
 		if not targetcache.Ui then
 			targetcache.Ui = NewButton
 			NewButton.Parent = RspyUI.List.ScrollingFrame
@@ -3274,7 +3276,7 @@ do
 		NewButton.Tick.Text = TextNow
 		NewButton.Frame.BackgroundColor3 = Rspy.Colors[Method] or Color3.fromRGB(255, 255, 255)
 		
-		local NewChildButton = NewButton.Child.UIListLayout.Frame:Clone()
+		local NewChildButton = Clone(NewButton.Child.UIListLayout.Frame)
 		
 		local CallStack = {}
 
