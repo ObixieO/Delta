@@ -2444,6 +2444,20 @@ do
 		end
 	end
 	
+	function WYY.NewSongButton(Info)
+		local NewSongButton = WYYUI.Song:Clone()
+		NewSongButton.SongName.Text = Info.Name
+		NewSongButton.TextButton.Text = Info.Author
+		NewSongButton.Length.Text = Info.Length and fmtTime(Info.Length) or "Unknow"
+		NewSongButton.ImageLabel.Image = Info.ImageId
+		NewSongButton.Visible = true
+		NewSongButton.MouseButton1Click:Connect(function()
+			WYY.Play(Info.Id)
+		end)
+		
+		return NewSongButton
+	end
+	
 	function WYY.ShowList(List)
 		for i,v in WYYUI.Pages["列表"].ScrollingFrame:GetChildren() do
 			if v:IsA("TextButton") then
@@ -2453,19 +2467,7 @@ do
 		
 		for _,id in List do
 			local Info = WYY.GetSongInfo(id)
-			
-			local NewSongButton = WYYUI.Song:Clone()
-			NewSongButton.SongName.Text = Info.Name
-			NewSongButton.TextButton.Text = Info.Author
-			NewSongButton.Length.Text = Info.Length and fmtTime(Info.Length) or "Unknow"
-			NewSongButton.ImageLabel.Image = Info.ImageId
-			NewSongButton.Visible = true
-
-			NewSongButton.Parent = WYYUI.Pages["列表"].ScrollingFrame
-
-			NewSongButton.MouseButton1Click:Connect(function()
-				WYY.Play(Info.Id)
-			end)
+			WYY.NewSongButton(Info).Parent = WYYUI.Pages["列表"].ScrollingFrame
 		end
 		
 		WYY.TogglePage("列表")
@@ -2548,18 +2550,7 @@ do
 			local List = WYY.Search(SearchText,10,Offset)
 			
 			for i,v in List do
-				local NewSongButton = WYYUI.Song:Clone()
-				NewSongButton.SongName.Text = v.Name
-				NewSongButton.TextButton.Text = v.Author
-				NewSongButton.Length.Text = v.Length and fmtTime(v.Length) or "Unknow"
-				NewSongButton.ImageLabel.Image = v.ImageId
-				NewSongButton.Visible = true
-				
-				NewSongButton.Parent = WYYUI.Pages["搜索"].ScrollingFrame
-				
-				NewSongButton.MouseButton1Click:Connect(function()
-					WYY.Play(v.Id)
-				end)
+				WYY.NewSongButton(v).Parent = WYYUI.Pages["搜索"].ScrollingFrame
 			end
 		end
 		
@@ -2599,6 +2590,16 @@ do
 				end
 				
 				WYY.Play(WYY.SongList[index])
+			end
+		end)
+		WYYUI.Frame.Love.MouseButton1Click:Connect(function()
+			if not WYY.PlayingSong then return end
+			local id = WYY.PlayingSong.Id
+			
+			if IsLoved(id) then
+				delfile(`music163/Loved/{id}`)
+			else
+				writefile(`music163/Loved/{id}`,"Obi_xieO")
 			end
 		end)
 		
@@ -2712,18 +2713,8 @@ do
 		end)
 		
 		for i,v in WYY.Search("热歌",20,1) do
-			local NewSongButton = WYYUI.Song:Clone()
-			NewSongButton.SongName.Text = v.Name
-			NewSongButton.TextButton.Text = v.Author
-			NewSongButton.Length.Text = v.Length and fmtTime(v.Length) or "Unknow"
-			NewSongButton.ImageLabel.Image = v.ImageId
-			NewSongButton.Visible = true
-
-			NewSongButton.Parent = WYYUI.Pages["推荐"].ScrollingFrame
-
-			NewSongButton.MouseButton1Click:Connect(function()
-				WYY.Play(v.Id)
-			end)
+			local Info = WYY.GetSongInfo(v)
+			WYY.NewSongButton(Info).Parent = WYYUI.Pages["推荐"].ScrollingFrame
 		end
 	end
 end
