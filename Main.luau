@@ -2502,7 +2502,7 @@ do
 			WYYUI.Frame.Rate.Text = `{Display}x`
 			
 			WYYUI.Rate.Scroll.Frame.Size = UDim2.fromScale(v,1)
-			WYYUI.Rate.Scroll.Frame.Point.Position = UDim2.fromScale(v,.5)
+			WYYUI.Rate.Scroll.Point.Position = UDim2.fromScale(v,.5)
 		end)
 		
 		RunService.RenderStepped:Connect(function(dt)
@@ -2623,6 +2623,7 @@ do
 				
 				WYYUI.Rate.Scroll.Frame.Size = UDim2.fromScale(ratioX,1)
 				WYYUI.Rate.Scroll.Point.Position = UDim2.fromScale(ratioX,.5)
+				WYYUI.Rate.CurrentRate.Text = `{math.floor(300 * ratioX)/100}x`
 			end
 
 			update()
@@ -2682,14 +2683,14 @@ do
 				
 				WYY.TogglePage("搜索")
 				
-				SearchOffset = 0
+				SearchOffset = 1
 				SearchText = WYYUI.Top.Search.TextBox.Text
 				
 				AddSearchSongs(SearchOffset)
 			end
 		end)
 		WYYUI.Pages["搜索"].ScrollingFrame.LoadMore.MouseButton1Click:Connect(function()
-			SearchOffset += 10
+			SearchOffset += 1
 			
 			AddSearchSongs(SearchOffset)
 		end)
