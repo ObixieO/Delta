@@ -3408,7 +3408,7 @@ do
 		
 		local IsA = game.IsA
 		
-		local NameCall;NameCall = othhook(rawget(InstanceRaw,"__namecall"), function(...)
+		local NameCall;NameCall = hookmetamethod(game,"__namecall",function(...)
 			local method = string.lower(getnamecallmethod() or "")
 			
 			local args = {select(2,...)}
@@ -3435,7 +3435,14 @@ do
 						self.ClassName == "RemoteFunction"
 					) then
 					
-					local returnvalue = NameCall(...)
+					
+					local success, returnvalue = pcall(function()
+						return NameCall(unpack(args))
+					end)
+
+					if not success then
+						error(returnvalue, 0)
+					end
 
 					task.spawn(function()
 						pcall(setthreadidentity, 8)
