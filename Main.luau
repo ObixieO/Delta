@@ -3408,34 +3408,32 @@ do
 		
 		local IsA = game.IsA
 		
-		local NameCall;NameCall = hookmetamethod(game,"__namecall",function(...)
+		local NameCall;NameCall = hookmetamethod(game,"__namecall",newcclosure(function(...)
 			local method = string.lower(getnamecallmethod() or "")
-			
+
 			local args = {select(2,...)}
 			local self = (...)
-			
+
 			if method and self and typeof(self) == "Instance" then
 				if 
 					(
 						method == "fireserver" and 
-						(
-							self.ClassName == "RemoteEvent" or 
-							self.ClassName == "UnreliableRemoteEvent"
-						)
+							(
+								self.ClassName == "RemoteEvent" or 
+								self.ClassName == "UnreliableRemoteEvent"
+							)
 					)
 				then
-					task.spawn(function()
-						pcall(setthreadidentity, 8)
-						pcall(Rspy.Log,self,method,args) 
-					end)
-					
+					pcall(setthreadidentity, 8)
+					pcall(Rspy.Log,self,method,args) 
+
 				elseif 
 					(
 						method == "invokeserver" and 
-						self.ClassName == "RemoteFunction"
+							self.ClassName == "RemoteFunction"
 					) then
-					
-					
+
+
 					local success, returnvalue = pcall(function()
 						return NameCall(unpack(args))
 					end)
@@ -3444,23 +3442,21 @@ do
 						error(returnvalue, 0)
 					end
 
-					task.spawn(function()
-						pcall(setthreadidentity, 8)
-						pcall(Rspy.Log,self,method,args,returnvalue)
-					end)
+					pcall(setthreadidentity, 8)
+					pcall(Rspy.Log,self,method,args,returnvalue)
 
 					return returnvalue
 				elseif method == "httpget" and self.ClassName == "DataModel" then
 					local returnvalue = NameCall(...)
-					
+
 					pcall(Rspy.Log,self,"httpget",args,returnvalue)
-					
+
 					return returnvalue
 				end
 			end
-			
+
 			return NameCall(...)
-		end)
+		end))
 		
 		local NewIndex;NewIndex = othhook(rawget(InstanceRaw,"__newindex"), function(...)
 			local self, key, value = ...
