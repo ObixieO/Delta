@@ -3288,6 +3288,7 @@ do
 
 		NewChildButton.Tick.Text = TextNow
 		NewChildButton.Parent = NewButton.Child
+		NewChildButton.LayoutOrder = -LogCounter
 		NewChildButton.TextButton.MouseButton1Click:Connect(function()
 			Rspy.CurrentInfo = {
 				Remote = Remote,
