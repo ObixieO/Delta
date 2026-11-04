@@ -2707,7 +2707,7 @@ do
 			WYY.ShowList(WYY.SongList)
 		end)
 		
-		for i,v in WYY.Search("热歌",20,0) do
+		for i,v in WYY.Search("热歌",20,1) do
 			local NewSongButton = WYYUI.Song:Clone()
 			NewSongButton.SongName.Text = v.Name
 			NewSongButton.TextButton.Text = v.Author
