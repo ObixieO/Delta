@@ -3261,6 +3261,7 @@ do
 		end
 		
 		local Now = tick()
+		local TextNow = os.date("%X")
 		targetcache.Tick = Now
 		
 		LogCounter += 1
@@ -3270,7 +3271,7 @@ do
 			(Method == "request" and args[1].Url) or 
 			(Remote.Name)
 		
-		NewButton.Tick.Text = os.date("%X")
+		NewButton.Tick.Text = TextNow
 		NewButton.Frame.BackgroundColor3 = Rspy.Colors[Method] or Color3.fromRGB(255, 255, 255)
 		
 		local NewChildButton = NewButton.Child.UIListLayout.Frame:Clone()
@@ -3283,7 +3284,7 @@ do
 			table.insert(CallStack, { s = s, n = n, f = f })
 		end
 
-
+		NewChildButton.Tick.Text = TextNow
 		NewChildButton.Parent = NewButton.Child
 		NewChildButton.TextButton.MouseButton1Click:Connect(function()
 			Rspy.CurrentInfo = {
@@ -3299,8 +3300,6 @@ do
 			
 			Rspy.GenCode()
 		end)
-		
-	
 	end
 	
 	
