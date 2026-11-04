@@ -2267,8 +2267,15 @@ do
 		end)
 	end
 
+
 	local function GetThumb(ImageId)
 		if isfile(`music163/Cached/{ImageId}_thumb.jpg`) then
+			return getcustomasset(`music163/Cached/{ImageId}_thumb.jpg`)
+		end
+
+		if typeof(ImageId) == "string" then
+			writefile(`music163/Cached/{ImageId}_thumb.jpg`,game:HttpGet(ImageId))
+
 			return getcustomasset(`music163/Cached/{ImageId}_thumb.jpg`)
 		end
 
@@ -2299,23 +2306,22 @@ do
 	end
 
 	function WYY.Search(keywords, limit, offset)
-		local api = `https://music.163.com/api/search/get/web?csrf_token=&type=1&offset={tostring(offset or 0)}&total=true&s={urlEncode(keywords)}&limit={tostring(limit or 10)}`
+		local api = `https://api.qijieya.cn/meting/?type=search&id={urlEncode(keywords)}&page={offset or 1}&limit={limit or 10}`
+		--local api = `https://music.163.com/api/search/get/web?csrf_token=&type=1&offset={tostring(offset or 0)}&total=true&s={urlEncode(keywords)}&limit={tostring(limit or 10)}`
 		local Result = game:HttpGet(api)
 
 		if Result then
 			local Info = HttpService:JSONDecode(Result)
 			if Info then
-				Info = Info.result.songs
-
 				local Songs = {}
 
 				for _, v in Info do
 					table.insert(Songs,{
-						Id = v.id,
+						Id = tonumber(v.url:match("id=(%d+)")),
 						Name = v.name,
-						Author = v.artists[1].name,
-						ImageId = GetThumb(v.album.picId),
-						Length = v.duration/1000,
+						Author = v.artist,
+						ImageId = GetThumb(v.pic),
+						--Length = v.duration/1000,
 					})
 				end
 
@@ -2451,7 +2457,7 @@ do
 			local NewSongButton = WYYUI.Song:Clone()
 			NewSongButton.SongName.Text = Info.Name
 			NewSongButton.TextButton.Text = Info.Author
-			NewSongButton.Length.Text = fmtTime(Info.Length)
+			NewSongButton.Length.Text = Info.Length and fmtTime(Info.Length) or "Unknow"
 			NewSongButton.ImageLabel.Image = Info.ImageId
 
 			NewSongButton.Parent = WYYUI.Pages["列表"].ScrollingFrame
@@ -2544,7 +2550,7 @@ do
 				local NewSongButton = WYYUI.Song:Clone()
 				NewSongButton.SongName.Text = v.Name
 				NewSongButton.TextButton.Text = v.Author
-				NewSongButton.Length.Text = fmtTime(v.Length)
+				NewSongButton.Length.Text = v.Length and fmtTime(v.Length) or "Unknow"
 				NewSongButton.ImageLabel.Image = v.ImageId
 				
 				NewSongButton.Parent = WYYUI.Pages["搜索"].ScrollingFrame
@@ -2702,7 +2708,7 @@ do
 			local NewSongButton = WYYUI.Song:Clone()
 			NewSongButton.SongName.Text = v.Name
 			NewSongButton.TextButton.Text = v.Author
-			NewSongButton.Length.Text = fmtTime(v.Length)
+			NewSongButton.Length.Text = v.Length and fmtTime(v.Length) or "Unknow"
 			NewSongButton.ImageLabel.Image = v.ImageId
 
 			NewSongButton.Parent = WYYUI.Pages["推荐"].ScrollingFrame
