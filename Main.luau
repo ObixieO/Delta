@@ -2598,8 +2598,14 @@ do
 			
 			if IsLoved(id) then
 				delfile(`music163/Loved/{id}`)
+				WYYUI.Frame.Love.Text = "♡"
 			else
 				writefile(`music163/Loved/{id}`,"Obi_xieO")
+				WYYUI.Frame.Love.Text = "❤"
+			end
+			
+			if WYY.RefreshLoved then
+				WYY.RefreshLoved()
 			end
 		end)
 		
@@ -2697,15 +2703,21 @@ do
 		end)
 		WYYUI.List.Buttons["搜索"].MouseButton1Click:Connect(function()
 			WYY.TogglePage("搜索")
+			WYY.RefreshLoved = nil
 		end)
 		WYYUI.List.Buttons["推荐"].MouseButton1Click:Connect(function()
 			WYY.TogglePage("推荐")
+			WYY.RefreshLoved = nil
 		end)
 		WYYUI.List.Buttons["喜欢"].MouseButton1Click:Connect(function()
 			WYY.ShowList(GetLoved())
+			WYY.RefreshLoved = function()
+				WYY.ShowList(GetLoved())
+			end
 		end)
 		WYYUI.List.Buttons["队列"].MouseButton1Click:Connect(function()
 			WYY.ShowList(WYY.SongList)
+			WYY.RefreshLoved = nil
 		end)
 		
 		WYYUI.Sound.Ended:Connect(function()
