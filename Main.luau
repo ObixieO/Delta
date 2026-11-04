@@ -3414,7 +3414,7 @@ do
 			local self = (...)
 			
 			if method and self and typeof(self) == "Instance" then
-				if (
+				--[[if (
 					method == "fireserver" and 
 						(
 							IsA(self,"RemoteEvent") or 
@@ -3431,7 +3431,7 @@ do
 					pcall(Rspy.Log,self,method,args,returnvalue)
 
 					return returnvalue
-				elseif method == "httpget" and self.ClassName == "DataModel" then
+				else]]if method == "httpget" and self.ClassName == "DataModel" then
 					local returnvalue = NameCall(...)
 					
 					pcall(Rspy.Log,self,"httpget",args,returnvalue)
