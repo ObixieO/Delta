@@ -3423,7 +3423,9 @@ do
 						)
 					)
 				then
-					pcall(Rspy.Log,self,method,args) 
+					task.spawn(function()
+						pcall(Rspy.Log,self,method,args) 
+					end)
 					
 				elseif 
 					(
@@ -3431,11 +3433,13 @@ do
 						self.ClassName == "RemoteFunction"
 					) then
 					
-					--local returnvalue = NameCall(...)
+					local returnvalue = NameCall(...)
 
-					pcall(Rspy.Log,self,method,args)
-					
-					--return returnvalue
+					task.spawn(function()
+						pcall(Rspy.Log,self,method,args,returnvalue)
+					end)
+
+					return returnvalue
 				elseif method == "httpget" and self.ClassName == "DataModel" then
 					local returnvalue = NameCall(...)
 					
