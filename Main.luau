@@ -3332,7 +3332,7 @@ do
 				if typeof(S) == "Instance" then Origin = S end
 			end
 
-			local args = table.pack(...)
+			local args = {...}
 
 			local InitEnv, InitIdentity = getfenv(0), getthreadidentity()
 
@@ -3341,9 +3341,9 @@ do
 			
 			local success, results = pcall(function()
 				if IsDirect then
-					return table.pack(Original(table.unpack(args)))
+					return {Original(table.unpack(args))}
 				else
-					return table.pack(Original(Callback, table.unpack(args)))
+					return {Original(Callback, table.unpack(args))}
 				end
 			end)
 
@@ -3358,7 +3358,7 @@ do
 			setthreadidentity(InitIdentity)
 			
 			pcall(Rspy.Log, Instance, "onclientinvoke", args, results)
-			return table.unpack(results, 1, results.n)
+			return unpack(results)
 		end
 
 		if setstackhidden then
@@ -3424,7 +3424,6 @@ do
 							)
 					)
 				then
-					pcall(setthreadidentity, 8)
 					pcall(Rspy.Log,self,method,args) 
 
 				elseif 
@@ -3435,14 +3434,13 @@ do
 
 
 					local success, returnvalue = pcall(function()
-						return NameCall(unpack(args))
+						return NameCall(self,unpack(args))
 					end)
 
 					if not success then
 						error(returnvalue, 0)
 					end
 
-					pcall(setthreadidentity, 8)
 					pcall(Rspy.Log,self,method,args,returnvalue)
 
 					return returnvalue
@@ -3495,7 +3493,7 @@ do
 			local Signal = Instance["OnClientEvent"]
 			if Signal and not ConnectCache[Signal] then
 				ConnectCache[Signal] = Signal:Connect(function(...)
-					pcall(Rspy.Log, Instance, "onclientevent", table.pack(...))
+					pcall(Rspy.Log, Instance, "onclientevent", {...})
 				end)
 			end
 		end
