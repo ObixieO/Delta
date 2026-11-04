@@ -3227,18 +3227,30 @@ do
 	local LogCounter = 0
 	
 	function Rspy.Log(Remote,Method,args,returnvalue)
-		local NewButton = LogCache[Remote] and LogCache[Remote][Method] and LogCache[Remote][Method].Ui
+		local targetcache
 		
-		if not NewButton then
-			NewButton = RspyUI.List.ScrollingFrame.UIListLayout.Frame:Clone()
-			NewButton.Parent = RspyUI.List.ScrollingFrame
-			
+		if Method == "httpget" then
+			LogCache[Method] = LogCache[Method] or {}
+			if args[1] then
+				targetcache = LogCache[Method][args[1]] or {}
+				LogCache[Method][args[1]] = targetcache
+			end
+		elseif Method == "request" then
+			LogCache[Method] = LogCache[Method] or {}
+			if args[1] and args[1].Url then
+				targetcache = LogCache[Method][args[1].Url] or {}
+				LogCache[Method][args[1].Url] = targetcache
+			end
+		else
 			LogCache[Remote] = LogCache[Remote] or {}
-			LogCache[Remote][Method] = {
-				Ui = NewButton,
-				Tick = tick()
-			}
-			
+			targetcache = LogCache[Remote][Method] or {}
+			LogCache[Remote][Method] = targetcache
+		end
+		
+		local NewButton = targetcache.Ui or RspyUI.List.ScrollingFrame.UIListLayout.Frame:Clone()
+		if not targetcache.Ui then
+			targetcache.Ui = NewButton
+			NewButton.Parent = RspyUI.List.ScrollingFrame
 			NewButton.TextButton.MouseButton1Click:Connect(function()
 				NewButton.Child.Visible = not NewButton.Child.Visible
 			end)
@@ -3249,7 +3261,11 @@ do
 		
 		LogCounter += 1
 		NewButton.LayoutOrder = -LogCounter
-		NewButton.RemoteName.Text = Remote.Name
+		NewButton.RemoteName.Text = 
+			(Method == "httpget" and args[1]) or 
+			(Method == "request" and args[1].Url) or 
+			(Remote.Name)
+		
 		NewButton.Tick.Text = os.date("%X")
 		NewButton.Frame.BackgroundColor3 = Rspy.Colors[Method] or Color3.fromRGB(255, 255, 255)
 		
@@ -3435,7 +3451,7 @@ do
 		end)
 		
 		local HttpGetH;HttpGetH = othhook(game.HttpGet, function(self, ...)
-			local args = {...}
+			local args = {select(2,...)}
 			
 			local ReturnValue = HttpGetH(self, ...)
 			
