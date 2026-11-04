@@ -2555,20 +2555,6 @@ do
 			end
 		end
 		
-		for i,v in WYY.Search("热歌",50,0) do
-			local NewSongButton = WYYUI.Song:Clone()
-			NewSongButton.SongName.Text = v.Name
-			NewSongButton.TextButton.Text = v.Author
-			NewSongButton.Length.Text = fmtTime(v.Length)
-			NewSongButton.ImageLabel.Image = v.ImageId
-			
-			NewSongButton.Parent = WYYUI.Pages["推荐"].ScrollingFrame
-			
-			NewSongButton.MouseButton1Click:Connect(function()
-				WYY.Play(v.Id)
-			end)
-		end
-		
 		WYYUI.Frame.Player.Frame.TextButton.MouseButton1Click:Connect(function()
 			if not WYY.PlayingSong then return end
 			
@@ -2711,6 +2697,20 @@ do
 		WYYUI.List.Buttons["队列"].MouseButton1Click:Connect(function()
 			WYY.ShowList(WYY.SongList)
 		end)
+		
+		for i,v in WYY.Search("热歌",20,0) do
+			local NewSongButton = WYYUI.Song:Clone()
+			NewSongButton.SongName.Text = v.Name
+			NewSongButton.TextButton.Text = v.Author
+			NewSongButton.Length.Text = fmtTime(v.Length)
+			NewSongButton.ImageLabel.Image = v.ImageId
+
+			NewSongButton.Parent = WYYUI.Pages["推荐"].ScrollingFrame
+
+			NewSongButton.MouseButton1Click:Connect(function()
+				WYY.Play(v.Id)
+			end)
+		end
 	end
 end
 
