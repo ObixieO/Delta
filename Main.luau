@@ -2459,6 +2459,7 @@ do
 			NewSongButton.TextButton.Text = Info.Author
 			NewSongButton.Length.Text = Info.Length and fmtTime(Info.Length) or "Unknow"
 			NewSongButton.ImageLabel.Image = Info.ImageId
+			NewSongButton.Visible = true
 
 			NewSongButton.Parent = WYYUI.Pages["列表"].ScrollingFrame
 
@@ -2552,6 +2553,7 @@ do
 				NewSongButton.TextButton.Text = v.Author
 				NewSongButton.Length.Text = v.Length and fmtTime(v.Length) or "Unknow"
 				NewSongButton.ImageLabel.Image = v.ImageId
+				NewSongButton.Visible = true
 				
 				NewSongButton.Parent = WYYUI.Pages["搜索"].ScrollingFrame
 				
@@ -2710,6 +2712,7 @@ do
 			NewSongButton.TextButton.Text = v.Author
 			NewSongButton.Length.Text = v.Length and fmtTime(v.Length) or "Unknow"
 			NewSongButton.ImageLabel.Image = v.ImageId
+			NewSongButton.Visible = true
 
 			NewSongButton.Parent = WYYUI.Pages["推荐"].ScrollingFrame
 
