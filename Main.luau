@@ -597,7 +597,7 @@ function Delta:Init()
 	local OldText = ""
 
 	CodeInput:GetPropertyChangedSignal("Text"):Connect(function()
-		if not Delta.Settings.CurrentSettings.CodeHighlight then return end
+		if not Delta.Settings.CurrentSettings.CodeHighlight or not Delta.CurrentScript then return end
 
 		local Text = CodeInput.Text
 
@@ -635,12 +635,14 @@ function Delta:Init()
 		Delta:OpenScript(Delta:AddScript("Script",""))
 	end)
 	Buttons.Run.MouseButton1Click:Connect(function()
+		if not Delta.CurrentScript then return end
 		loadstring(Delta.CurrentScript.Source)()
 	end)
 	Buttons.Clear.MouseButton1Click:Connect(function()
 		CodeInput.Text = ""
 	end)
 	Buttons.Save.MouseButton1Click:Connect(function()
+		if not Delta.CurrentScript then return end
 		local Name = Delta.CurrentScript.Button.Name
 		writefile(`SavedScripts/{Name}`,Delta.CurrentScript.Source)
 		Delta:RefreshSavedScript()
@@ -775,10 +777,18 @@ function Delta:Init()
 		end)
 
 		getgenv().print = function(...)
-			Delta:AddConsoleMessage("Delta",table.concat({...}," "),Enum.MessageType.MessageOutput)
+			local str = ""
+			for i,v in {...} do
+				str = str..tostring(v).." "
+			end
+			Delta:AddConsoleMessage("Delta",str,Enum.MessageType.MessageOutput)
 		end
 		getgenv().warn = function(...)
-			Delta:AddConsoleMessage("Delta",table.concat({...}," "),Enum.MessageType.MessageWarning)
+			local str = ""
+			for i,v in {...} do
+				str = str..tostring(v).." "
+			end
+			Delta:AddConsoleMessage("Delta",str,Enum.MessageType.MessageWarning)
 		end
 		getgenv().error = function(Message,level)
 			Delta:AddConsoleMessage("Delta",Message or "Error occurred, no output from Luau.",Enum.MessageType.MessageError)
@@ -1042,9 +1052,11 @@ function Delta:Init()
 		v.Enabled = false
 	end
 	
-	for i,v in Delta.Misc do
-		if v.Init then
-			v.Init()
+	if not RunService:IsStudio() then
+		for i,v in Delta.Misc do
+			if v.Init then
+				v.Init()
+			end
 		end
 	end
 	
@@ -2216,8 +2228,1212 @@ Highlighter.DEFAULT_COLORS = DEFAULT_COLORS
 --  杂项
 -----------------------------------------------------------
 
+do
+	local bit32 = bit32
+
+	local SHA256 = {}
+
+	local function rrotate(x: number, n: number): number
+		return bit32.bor(bit32.rshift(x, n), bit32.lshift(x, 32 - n))
+	end
+
+	local function rshift(x: number, n: number): number
+		return bit32.rshift(x, n)
+	end
+
+	local K = {
+		0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5,
+		0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+		0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3,
+		0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+		0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc,
+		0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+		0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7,
+		0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+		0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13,
+		0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+		0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3,
+		0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+		0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5,
+		0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+		0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208,
+		0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
+	}
+
+	local H0 = {
+		0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+		0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
+	}
+
+	local function packUInt32BE(n: number): string
+		n = n % 0x100000000
+		local b1 = math.floor(n / 0x1000000) % 0x100
+		local b2 = math.floor(n / 0x10000) % 0x100
+		local b3 = math.floor(n / 0x100) % 0x100
+		local b4 = n % 0x100
+		return string.char(b1, b2, b3, b4)
+	end
+
+	local function preprocess(message: string): string
+		local len = #message
+		local bitLen = len * 8
+
+		message = message .. "\x80"
+
+		while #message % 64 ~= 56 do
+			message = message .. "\x00"
+		end
+
+		local high = math.floor(bitLen / 0x100000000)
+		local low = bitLen % 0x100000000
+		message = message .. packUInt32BE(high) .. packUInt32BE(low)
+
+		return message
+	end
+
+	local function processBlock(H: { number }, block: string)
+		local w: { number } = table.create(64)
+
+		for i = 0, 15 do
+			local offset = i * 4 + 1
+			local b1, b2, b3, b4 = string.byte(block, offset, offset + 3)
+			w[i + 1] = bit32.bor(
+				bit32.lshift(b1, 24),
+				bit32.lshift(b2, 16),
+				bit32.lshift(b3, 8),
+				b4
+			)
+		end
+
+		for i = 17, 64 do
+			local s0 = bit32.bxor(
+				rrotate(w[i - 15], 7),
+				rrotate(w[i - 15], 18),
+				rshift(w[i - 15], 3)
+			)
+			local s1 = bit32.bxor(
+				rrotate(w[i - 2], 17),
+				rrotate(w[i - 2], 19),
+				rshift(w[i - 2], 10)
+			)
+			w[i] = (w[i - 16] + s0 + w[i - 7] + s1) % 0x100000000
+		end
+
+		local a, b, c, d, e, f, g, h =
+			H[1], H[2], H[3], H[4], H[5], H[6], H[7], H[8]
+
+		for i = 1, 64 do
+			local S1 = bit32.bxor(
+				rrotate(e, 6),
+				rrotate(e, 11),
+				rrotate(e, 25)
+			)
+			local ch = bit32.bxor(bit32.band(e, f), bit32.band(bit32.bnot(e), g))
+			local temp1 = (h + S1 + ch + K[i] + w[i]) % 0x100000000
+			local S0 = bit32.bxor(
+				rrotate(a, 2),
+				rrotate(a, 13),
+				rrotate(a, 22)
+			)
+			local maj = bit32.bxor(
+				bit32.band(a, b),
+				bit32.band(a, c),
+				bit32.band(b, c)
+			)
+			local temp2 = (S0 + maj) % 0x100000000
+
+			h = g
+			g = f
+			f = e
+			e = (d + temp1) % 0x100000000
+			d = c
+			c = b
+			b = a
+			a = (temp1 + temp2) % 0x100000000
+		end
+
+		H[1] = (H[1] + a) % 0x100000000
+		H[2] = (H[2] + b) % 0x100000000
+		H[3] = (H[3] + c) % 0x100000000
+		H[4] = (H[4] + d) % 0x100000000
+		H[5] = (H[5] + e) % 0x100000000
+		H[6] = (H[6] + f) % 0x100000000
+		H[7] = (H[7] + g) % 0x100000000
+		H[8] = (H[8] + h) % 0x100000000
+	end
+
+	function SHA256.sha256(message: string): string
+		local H = table.clone(H0)
+		local padded = preprocess(message)
+
+		for i = 1, #padded, 64 do
+			local block = string.sub(padded, i, i + 63)
+			processBlock(H, block)
+		end
+
+		local out = {}
+		for i = 1, 8 do
+			local word = H[i]
+			out[i] = string.format("%08x", word)
+		end
+		return table.concat(out)
+	end
+
+	Delta.SHA256 = SHA256.sha256
+end
+
 local MiscUi = Delta.Ui.ContentIsland.Main.something
 
+MiscUi.Frame.Folder.UIPageLayout.Parent = MiscUi.Frame
+MiscUi.Frame.Folder:Destroy()
+
+for i,v in MiscUi.Frame:GetChildren() do
+	if v:IsA("Frame") then
+		v.Visible = true
+	end
+end
+
+MiscUi.Frame.UIPageLayout:JumpTo(MiscUi.Frame.Key)
+
+do
+	local cloneref  = cloneref or function(...) return ... end
+	local TextService = cloneref(game:GetService("TextService"))
+	local RunService = cloneref(game:GetService("RunService"))
+
+	local Highlight = {}
+
+	local parentFrame
+	local scrollingFrame
+	local textFrame
+	local lineNumbersFrame
+	local lines = {}
+
+	local tableContents = {}
+
+	local line = 0
+	local largestX = 0
+
+	local lineSpace = 15
+	local font = Enum.Font.Ubuntu
+	local textSize = 14
+
+	local backgroundColor = Color3.fromRGB(40, 44, 52)
+	local operatorColor = Color3.fromRGB(187, 85, 255)
+	local functionColor = Color3.fromRGB(97, 175, 239)
+	local stringColor = Color3.fromRGB(152, 195, 121)
+	local numberColor = Color3.fromRGB(209, 154, 102)
+	local booleanColor = numberColor
+	local objectColor = Color3.fromRGB(229, 192, 123)
+	local defaultColor = Color3.fromRGB(224, 108, 117)
+	local commentColor = Color3.fromRGB(148, 148, 148)
+	local lineNumberColor = commentColor
+	local genericColor = Color3.fromRGB(240, 240, 240)
+
+	local operators = {"^(function)[^%w_]", "^(local)[^%w_]", "^(if)[^%w_]", "^(for)[^%w_]", "^(while)[^%w_]", "^(then)[^%w_]", "^(do)[^%w_]", "^(else)[^%w_]", "^(elseif)[^%w_]", "^(return)[^%w_]", "^(end)[^%w_]", "^(continue)[^%w_]", "^(and)[^%w_]", "^(not)[^%w_]", "^(or)[^%w_]", "[^%w_](or)[^%w_]", "[^%w_](and)[^%w_]", "[^%w_](not)[^%w_]", "[^%w_](continue)[^%w_]", "[^%w_](function)[^%w_]", "[^%w_](local)[^%w_]", "[^%w_](if)[^%w_]", "[^%w_](for)[^%w_]", "[^%w_](while)[^%w_]", "[^%w_](then)[^%w_]", "[^%w_](do)[^%w_]", "[^%w_](else)[^%w_]", "[^%w_](elseif)[^%w_]", "[^%w_](return)[^%w_]", "[^%w_](end)[^%w_]"}
+	local strings = {{"\"", "\""}, {"'", "'"}, {"%[%[", "%]%]", true}}
+	local comments = {"%-%-%[%[[^%]%]]+%]?%]?", "(%-%-[^\n]+)"}
+	local functions = {"[^%w_]([%a_][%a%d_]*)%s*%(", "^([%a_][%a%d_]*)%s*%(", "[:%.%(%[%p]([%a_][%a%d_]*)%s*%("}
+	local numbers = {"[^%w_](%d+[eE]?%d*)", "[^%w_](%.%d+[eE]?%d*)", "[^%w_](%d+%.%d+[eE]?%d*)", "^(%d+[eE]?%d*)", "^(%.%d+[eE]?%d*)", "^(%d+%.%d+[eE]?%d*)"}
+	local booleans = {"[^%w_](true)", "^(true)", "[^%w_](false)", "^(false)", "[^%w_](nil)", "^(nil)"}
+	local objects = {"[^%w_:]([%a_][%a%d_]*):", "^([%a_][%a%d_]*):"}
+	local other = {"[^_%s%w=>~<%-%+%*]", ">", "~", "<", "%-", "%+", "=", "%*"}
+	local offLimits = {}
+
+	local function isOffLimits(index)
+		for _, v in next, offLimits do
+			if index >= v[1] and index <= v[2] then
+				return true
+			end
+		end
+		return false
+	end
+
+	local function gfind(str, pattern)
+		return coroutine.wrap(function()
+			local start = 0
+			while true do
+				local findStart, findEnd = str:find(pattern, start)
+				if findStart and findEnd ~= #str then
+					start = findEnd + 1
+					coroutine.yield(findStart, findEnd)
+				else
+					return
+				end
+			end
+		end)
+	end
+
+	local function renderComments()
+		local str = Highlight:getRaw()
+		local step = 1
+		for _, pattern in next, comments do
+			for commentStart, commentEnd in gfind(str, pattern) do
+				if step % 1000 == 0 then
+					RunService.Heartbeat:Wait()
+				end
+				step += 1
+				if not isOffLimits(commentStart) then
+					for i = commentStart, commentEnd do
+						table.insert(offLimits, {commentStart, commentEnd})
+						if tableContents[i] then
+							tableContents[i].Color = commentColor
+						end
+					end
+				end
+			end
+		end
+	end
+
+	local function renderStrings()
+		local stringType
+		local stringEndType
+		local ignoreBackslashes
+		local stringStart
+		local stringEnd
+		local offLimitsIndex
+		local skip = false
+
+		for i, char in next, tableContents do
+			if stringType then
+				char.Color = stringColor
+				local possibleString = ""
+				for k = stringStart, i do
+					possibleString = possibleString .. tableContents[k].Char
+				end
+				if char.Char:match(stringEndType) and not not ignoreBackslashes or (possibleString:match("(\\*)" .. stringEndType .. "$") and #possibleString:match("(\\*)" .. stringEndType .. "$") % 2 == 0) then
+					skip = true
+					stringType = nil
+					stringEndType = nil
+					ignoreBackslashes = nil
+					stringEnd = i
+					offLimits[offLimitsIndex][2] = stringEnd
+				end
+			end
+			if not skip then
+				for _, v in next, strings do
+					if char.Char:match(v[1]) and not isOffLimits(i) then
+						stringType = v[1]
+						stringEndType = v[2]
+						ignoreBackslashes = v[3]
+						char.Color = stringColor
+						stringStart = i
+						offLimitsIndex = #offLimits + 1
+						offLimits[offLimitsIndex] = {stringStart, math.huge}
+					end
+				end
+			end
+			skip = false
+		end
+	end
+
+	local function highlightPattern(patternArray, color)
+		local str = Highlight:getRaw()
+		local step = 1
+		for _, pattern in next, patternArray do
+			for findStart, findEnd in gfind(str, pattern) do
+				if step % 1000 == 0 then
+					RunService.Heartbeat:Wait()
+				end
+				step += 1
+				if not isOffLimits(findStart) and not isOffLimits(findEnd) then
+					for i = findStart, findEnd do
+						if tableContents[i] then
+							tableContents[i].Color = color
+						end
+					end
+				end
+			end
+		end
+	end
+
+	local function autoEscape(s)
+		for i = 0, #s do
+			local char = string.sub(s, i, i)
+			if char == "<" then
+				s = string.format("%s%s%s", string.sub(s, 0, i - 1), "&lt;", string.sub(s, i + 1, -1))
+				i += 3
+			elseif char == ">" then
+				s = string.format("%s%s%s", string.sub(s, 0, i - 1), "&gt;", string.sub(s, i + 1, -1))
+				i += 3
+			elseif char == '"' then
+				s = string.format("%s%s%s", string.sub(s, 0, i - 1), "&quot;", string.sub(s, i + 1, -1))
+				i += 5
+			elseif char == "'" then
+				s = string.format("%s%s%s", string.sub(s, 0, i - 1), "&apos;", string.sub(s, i + 1, -1))
+				i += 5
+			elseif char == "&" then
+				s = string.format("%s%s%s", string.sub(s, 0, i - 1), "&amp;", string.sub(s, i + 1, -1))
+				i += 4
+			end
+		end
+		return s
+	end
+
+	local function render()
+		offLimits = {}
+		lines = {}
+		textFrame:ClearAllChildren()
+		lineNumbersFrame:ClearAllChildren()
+
+		highlightPattern(functions, functionColor)
+		highlightPattern(numbers, numberColor)
+		highlightPattern(operators, operatorColor)
+		highlightPattern(objects, objectColor)
+		highlightPattern(booleans, booleanColor)
+		highlightPattern(other, genericColor)
+		renderComments()
+		renderStrings()
+
+		local lastColor
+		local lineStr = ""
+		local rawStr = ""
+		largestX = 0
+		line = 1
+
+		for i = 1, #tableContents + 1 do
+			local char = tableContents[i]
+			if i == #tableContents + 1 or char.Char == "\n" then
+				lineStr = lineStr .. (lastColor and "</font>" or "")
+
+				local lineText = Instance.new("TextLabel")
+				local x = TextService:GetTextSize(rawStr, textSize, font, Vector2.new(math.huge, math.huge)).X + 60
+
+				if x > largestX then
+					largestX = x
+				end
+
+				lineText.TextXAlignment = Enum.TextXAlignment.Left
+				lineText.TextYAlignment = Enum.TextYAlignment.Top
+				lineText.Position = UDim2.new(0, 0, 0, line * lineSpace - lineSpace / 2)
+				lineText.Size = UDim2.new(0, x, 0, textSize)
+				lineText.RichText = true
+				lineText.Font = font
+				lineText.TextSize = textSize
+				lineText.BackgroundTransparency = 1
+				lineText.Text = lineStr
+				lineText.Parent = textFrame
+
+				if i ~= #tableContents + 1 then
+					local lineNumber = Instance.new("TextLabel")
+					lineNumber.Text = line
+					lineNumber.Font = font
+					lineNumber.TextSize = textSize
+					lineNumber.Size = UDim2.new(1, 0, 0, lineSpace)
+					lineNumber.TextXAlignment = Enum.TextXAlignment.Right
+					lineNumber.TextColor3 = lineNumberColor
+					lineNumber.Position = UDim2.new(0, 0, 0, line * lineSpace - lineSpace / 2)
+					lineNumber.BackgroundTransparency = 1
+					lineNumber.Parent = lineNumbersFrame
+				end
+
+				lineStr = ""
+				rawStr = ""
+				lastColor = nil
+				line += 1
+				updateZIndex()
+				updateCanvasSize()
+				if line % 5 == 0 then
+					RunService.Heartbeat:Wait()
+				end
+			elseif char.Char == " " then
+				lineStr = lineStr .. char.Char
+				rawStr = rawStr .. char.Char
+			elseif char.Char == "\t" then
+				lineStr = lineStr .. string.rep(" ", 4)
+				rawStr = rawStr .. char.Char
+			else
+				if char.Color == lastColor then
+					lineStr = lineStr .. autoEscape(char.Char)
+				else
+					lineStr = lineStr .. string.format('%s<font color="rgb(%d,%d,%d)">', lastColor and "</font>" or "", char.Color.R * 255, char.Color.G * 255, char.Color.B * 255)
+					lineStr = lineStr .. autoEscape(char.Char)
+					lastColor = char.Color
+				end
+				rawStr = rawStr .. char.Char
+			end
+		end
+		updateZIndex()
+		updateCanvasSize()
+	end
+
+	function onFrameSizeChange()
+		local newSize = parentFrame.AbsoluteSize
+		scrollingFrame.Size = UDim2.new(0, newSize.X, 0, newSize.Y)
+	end
+
+	function updateCanvasSize()
+		scrollingFrame.CanvasSize = UDim2.new(0, largestX, 0, line * lineSpace)
+	end
+
+	function updateZIndex()
+		for _, v in next, parentFrame:GetDescendants() do
+			if v:IsA("GuiObject") then
+				v.ZIndex = parentFrame.ZIndex
+			end
+		end
+	end
+	function Highlight:init(frame)
+		if typeof(frame) == "Instance" and frame:IsA("Frame") then
+			frame:ClearAllChildren()
+
+			parentFrame = frame
+			scrollingFrame = Instance.new("ScrollingFrame")
+			textFrame = Instance.new("Frame")
+			lineNumbersFrame = Instance.new("Frame")
+
+			local parentSize = frame.AbsoluteSize
+			scrollingFrame.Size = UDim2.new(0, parentSize.X, 0, parentSize.Y)
+			scrollingFrame.BackgroundColor3 = backgroundColor
+			scrollingFrame.BorderSizePixel = 0
+			scrollingFrame.ScrollBarThickness = 4
+
+			textFrame.Size = UDim2.new(1, -40, 1, 0)
+			textFrame.Position = UDim2.new(0, 40, 0, 0)
+			textFrame.BackgroundTransparency = 1
+
+			lineNumbersFrame.Size = UDim2.new(0, 25, 1, 0)
+			lineNumbersFrame.BackgroundTransparency = 1
+
+			textFrame.Parent = scrollingFrame
+			lineNumbersFrame.Parent = scrollingFrame
+			scrollingFrame.Parent = parentFrame
+
+			render()
+			parentFrame:GetPropertyChangedSignal("AbsoluteSize"):Connect(onFrameSizeChange)
+			parentFrame:GetPropertyChangedSignal("ZIndex"):Connect(updateZIndex)
+		else
+			error("Initialization error: argument " .. typeof(frame) .. " is not a Frame Instance")
+		end
+	end
+
+	function Highlight:setRaw(raw)
+		raw = raw .. "\n"
+		tableContents = {}
+		local line = 1
+		for i = 1, #raw do
+			table.insert(tableContents, {
+				Char = raw:sub(i, i),
+				Color = defaultColor,
+				-- Line = line
+			})
+			if i % 1000 == 0 then
+				RunService.Heartbeat:Wait()
+			end
+		end
+		render()
+	end
+
+	function Highlight:getRaw()
+		local result = ""
+		for _, char in next, tableContents do
+			result = result .. char.Char
+		end
+		return result
+	end
+
+	function Highlight:getString()
+		local result = ""
+		for _, char in next, tableContents do
+			result = result .. char.Char:sub(1, 1)
+		end
+		return result
+	end
+
+	function Highlight:getTable()
+		return tableContents
+	end
+
+	function Highlight:getSize()
+		return #tableContents
+	end
+
+	function Highlight:getLine(line)
+		local currentline = 0
+		local rightLine = false
+		local result = ""
+		for _, v in next, tableContents do
+			currentline = currentline + 1
+			if v.Char == "\n" and not rightLine then
+				rightLine = true
+			end
+			if rightLine and v.Char ~= "\n" then
+				result = result .. v.Char
+			elseif rightLine then
+				break
+			end
+		end
+		return result
+	end
+
+	function Highlight:setLine(line, text)
+		if #tableContents and line >= tableContents[#tableContents].Line then
+			for i = tableContents[#tableContents].Line, line do
+				table.insert(tableContents, {
+					Char = "\n",
+					Line = i,
+					Color = defaultColor
+				})
+				local str = Highlight:getRaw()
+				str = str:sub(0, #str) .. text
+				Highlight:setRaw(str)
+				return
+			end
+		elseif not #tableContents then
+			return
+		end
+		local str = Highlight:getRaw()
+		local lastStart = 0
+		local currentLine = 0
+		for i in gfind(str, "\n") do
+			currentLine = currentLine + 1
+			if line == currentLine then
+				str = str:sub(0, lastStart) .. text .. str:sub(i, #str)
+				Highlight:setRaw(str)
+				return
+			end
+		end
+		error("Unable to set line")
+	end
+
+	function Highlight:insertLine(line, text)
+		if #tableContents and line >= tableContents[#tableContents].Line then
+			Highlight:setLine(line, text)
+		elseif not #tableContents then
+			return
+		end
+		local str = Highlight:getRaw()
+		local lastStart = 0
+		local currentLine = 0
+		for i in gfind(str, "\n") do
+			currentLine = currentLine + 1
+			if line == currentLine then
+				str = str:sub(0, lastStart) .. "\n" .. text .. "\n" .. str:sub(i, #str)
+				Highlight:setRaw(str)
+				return
+			end
+		end
+		error("Unable to insert line")
+	end
+
+	local constructor = {}
+
+	function constructor.new(...)
+		local class = Highlight
+		local new = {}
+		class.__index = class
+		setmetatable(new, class)
+		new:init(...)
+		return new
+	end
+
+	Delta.constructor = constructor
+end
+
+--卡密
+do
+	local KeyManager = {
+		XClientVersion = "8.2.3"
+	}
+	
+	local KeyUi = MiscUi.Frame.Key
+	
+	Delta.Misc["密钥管理"] = KeyManager
+	
+	local function extractTicket(url)
+		if type(url) ~= "string" then return nil end
+		local ticket = url:match("[?&]d=([^&]+)") or url:match("[?&]ticket=([^&]+)")
+		return ticket
+	end
+	
+	function KeyManager.CreateLink(HWID,Platform)
+		local FinalHwid = Delta.SHA256(HWID)
+		local result = request({
+			Url = "https://api.platoboost.net/public/start",
+			Method = "POST",
+			Headers = {
+				["Content-Type"] = "application/json",
+			},
+			Body = HttpService:JSONEncode(
+				{
+					service = Platform == "Android" and 6 or 8,
+					identifier = FinalHwid,
+				}
+			)
+		})
+		if result and result.Success and result.StatusCode == 200 then
+			local data = HttpService:JSONDecode(result.Body)
+			local url = data and data.data and data.data.url
+			
+			return url
+		end
+	end
+	
+	function KeyManager.GetStatus(Link)
+		local api = `https://auth.platorelay.com/api/session/status?ticket={extractTicket(Link)}`
+		local Status = request({
+			Url = api,
+			Method = "GET",
+			Headers = {
+				["Accept"] = "application/json",
+				["X-Client-Name"] = "platoboost webclient",
+				["X-Client-Version"] = KeyManager.XClientVersion,
+			},
+		})
+		
+		local body
+		if type(Status) == "table" then
+			body = Status.Body or Status.body
+		elseif type(Status) == "string" then
+			body = Status
+		end
+
+		local ok, data = pcall(HttpService.JSONDecode, HttpService, body)
+		if ok and data and data.data then
+			return data.data --data.data.key, data.data.minutesLeft
+		end
+	end
+	
+	local function formatMinutes(mins)
+		if type(mins) ~= "number" then return "未知" end
+		if mins <= 0 then return "已过期" end
+
+		local totalSec = math.floor(mins * 60)
+		local days = math.floor(totalSec / 86400)
+		local hours = math.floor((totalSec % 86400) / 3600)
+		local minutes = math.floor((totalSec % 3600) / 60)
+		local seconds = totalSec % 60
+
+		if days > 0 then
+			return string.format("%d 天 %d 小时 %d 分", days, hours, minutes)
+		elseif hours > 0 then
+			return string.format("%d 小时 %d 分", hours, minutes)
+		elseif minutes > 0 then
+			return string.format("%d 分 %d 秒", minutes, seconds)
+		else
+			return string.format("%d 秒", seconds)
+		end
+	end
+	
+	function KeyManager.Init()
+		KeyUi.Background.MainScroll.HWID.Input.Text = gethwid()
+		local hwid = KeyUi.Background.MainScroll.HWID.Input.Text
+		local CurrentPlatform = getgenv().Delta.is_android() and "Android" or "IOS"
+		local CurrentLink = KeyManager.CreateLink(hwid, CurrentPlatform)
+		local Status = KeyManager.GetStatus(CurrentLink)
+
+		local expiresAt = nil
+		if Status and type(Status.minutesLeft) == "number" and Status.minutesLeft > 0 then
+			expiresAt = os.time() + Status.minutesLeft * 60
+		end
+
+		local timeLabel = KeyUi.Background.MainScroll.LeftTime.Frame.Frame.Time
+
+		local function formatRemaining(sec)
+			if sec <= 0 then return "已过期" end
+			local totalMin = math.floor(sec / 60)
+			local h = math.floor(totalMin / 60)
+			local m = totalMin % 60
+			if h > 0 then
+				return string.format("%d 小时 %d 分", h, m)
+			elseif totalMin > 0 then
+				return string.format("%d 分 %d 秒", m, sec % 60)
+			else
+				return string.format("%d 秒", sec)
+			end
+		end
+
+		local function update()
+			if not expiresAt then
+				timeLabel.Text = "已过期"
+				timeLabel.TextColor3 = Color3.fromRGB(248, 113, 113)
+				return
+			end
+			local remaining = expiresAt - os.time()
+			if remaining <= 0 then
+				timeLabel.Text = "已过期"
+				timeLabel.TextColor3 = Color3.fromRGB(248, 113, 113)
+			elseif remaining < 3600 then
+				timeLabel.Text = formatRemaining(remaining)
+				timeLabel.TextColor3 = Color3.fromRGB(250, 204, 21)
+			else
+				timeLabel.Text = formatRemaining(remaining)
+				timeLabel.TextColor3 = Color3.fromRGB(74, 222, 128)
+			end
+			
+			KeyUi.Background.MainScroll.LeftTime.Frame.Frame.Key.Text = Status.key or "无"
+		end
+
+		update()
+		
+		KeyUi.Background.MainScroll.LeftTime.Frame.Refresh.MouseButton1Click:Connect(function()
+			hwid = KeyUi.Background.MainScroll.HWID.Input.Text
+			CurrentLink = KeyManager.CreateLink(hwid, CurrentPlatform)
+			Status = KeyManager.GetStatus(CurrentLink)
+		end)
+		
+		local function TogglePlatform(Target)
+			for i,v in KeyUi.Background.MainScroll.Main.Platform.Frame:GetChildren() do
+				if v:IsA("TextButton") then
+					Tween(v,{.1},{
+						BackgroundColor3 = v.Name == Target and Color3.fromRGB(99, 102, 241) or Color3.fromRGB(2, 6, 23),
+						BackgroundTransparency = v.Name == Target and 0 or .4,
+						TextColor3 = v.Name == Target and Color3.fromRGB(199, 210, 254) or Color3.fromRGB(148, 163, 184),
+					})
+					CurrentPlatform = Target
+				end
+			end
+		end
+		
+		TogglePlatform(CurrentPlatform)
+		
+		for i,v in KeyUi.Background.MainScroll.Main.Platform.Frame:GetChildren() do
+			if v:IsA("TextButton") then
+				v.MouseButton1Click:Connect(function()
+					TogglePlatform(v.Name)
+				end)
+			end
+		end
+
+		task.spawn(function()
+			while task.wait(1) do
+				update()
+			end
+		end)
+	end
+end
+
+--Rspy
+do
+	local RspyUI = MiscUi.Frame.Rspy
+	local Rspy = {
+		CodeBox = Delta.constructor.new(RspyUI.Main.Code),
+		Colors = {
+			fireserver = Color3.fromRGB(255, 200, 0),
+			invokeserver = Color3.fromRGB(0, 150, 255),
+			onclientevent = Color3.fromRGB(50, 255, 0),
+			onclientinvoke = Color3.fromRGB(255, 100, 255),
+			httpget = Color3.fromRGB(255, 0, 0),
+			request = Color3.fromRGB(0, 0, 255),
+		},
+		CurrentInfo = nil,
+		Methods = {
+			fireserver = "%s:FireServer(unpack(args))",
+			invokeserver = "%s:InvokeServer(unpack(args))",
+			onclientevent = [[firesignal(%s.OnClientEvent,unpack(args))]],
+			onclientinvoke = [[getcallbackvalue(%s,"OnClientInvoke")(unpack(args))]],
+			httpget = "game:HttpGet(unpack(args))",
+			request = "request(unpack(args))",
+		},
+	}
+	
+	Delta.Misc["Rspy"] = Rspy
+	
+	if not RunService:IsStudio() then
+		LazyFix = getgenv().LazyFix or loadstring(game:HttpGet("https://raw.githubusercontent.com/qian-cheng-awa/Tools/refs/heads/main/TableToLua.lua"))()
+		getgenv().LazyFix = LazyFix
+	end
+	
+	function Rspy.TableToString(table)
+		return LazyFix.Convert(table, true)
+	end
+
+	function Rspy.GetPath(Obj)
+		if typeof(Obj) ~= "Instance" then
+			return tostring(Obj)
+		end
+
+		local function Same(a, b)
+			if rawequal(a, b) then return true end
+			if typeof(a) ~= "Instance" or typeof(b) ~= "Instance" then return false end
+			if compareinstances then
+				local ok, r = pcall(compareinstances, a, b)
+				return ok and r
+			end
+			return false
+		end
+
+		local function Segment(Name)
+			if type(Name) == "string" and Name:match("^[%a_][%w_]*$") then
+				return "." .. Name
+			end
+			local Escaped = tostring(Name):gsub("\\", "\\\\"):gsub('"', '\\"'):gsub("\n", "\\n")
+			return '["' .. Escaped .. '"]'
+		end
+
+		local function AsService(Child)
+			if Child.Parent and Same(Child.Parent, game) then
+				local ok, svc = pcall(game.FindService, game, Child.ClassName)
+				if ok and svc and Same(svc, Child) then
+					return ':GetService("' .. Child.ClassName .. '")'
+				end
+			end
+			return nil
+		end
+
+		if Same(Obj, game) then
+			return "game"
+		end
+
+		if Same(Obj, workspace) then
+			return "workspace"
+		end
+		if Player and Same(Obj, Player) then
+			return 'game:GetService("Players").LocalPlayer'
+		end
+		if Player and Player.Character and Same(Obj, Player.Character) then
+			return 'game:GetService("Players").LocalPlayer.Character'
+		end
+		if Same(Obj, game:GetService("Players")) then
+			return 'game:GetService("Players")'
+		end
+		if Same(Obj,gethui()) then
+			return 'gethui()'
+		end
+
+		local Segments = {}
+		local Cur = Obj
+		local HitNilParent = false
+
+		while Cur do
+			if Same(Cur, game) then
+				table.insert(Segments, 1, "game")
+				break
+			end
+			if Same(Cur, workspace) then
+				table.insert(Segments, 1, "workspace")
+				break
+			end
+			if Same(Cur, gethui()) then
+				table.insert(Segments, 1, "gethui()")
+				break
+			end
+			if Player and Same(Cur, Player) then
+				table.insert(Segments, 1, ".LocalPlayer")
+				table.insert(Segments, 1, 'game:GetService("Players")')
+				break
+			end
+
+			local Parent = Cur.Parent
+			if not Parent then
+				HitNilParent = true
+				table.insert(Segments, 1, Segment(Cur.Name))
+				break
+			end
+
+			local ServicePath = AsService(Cur)
+			if ServicePath then
+				table.insert(Segments, 1, ServicePath)
+				table.insert(Segments, 1, "game")
+				break
+			end
+
+			local Siblings = Parent:GetChildren()
+			local SameNameCount = 0
+			local MyIndex
+			for i, child in ipairs(Siblings) do
+				if child.Name == Cur.Name then
+					SameNameCount += 1
+					if Same(child, Cur) then
+						MyIndex = i
+					end
+				end
+			end
+
+			if SameNameCount > 1 and MyIndex then
+				table.insert(Segments, 1, ":GetChildren()[" .. MyIndex .. "]")
+			else
+				table.insert(Segments, 1, Segment(Cur.Name))
+			end
+
+			Cur = Parent
+		end
+
+		local Path = table.concat(Segments)
+		if HitNilParent then
+			Path = Path .. " --[[ Nil Parent ]]"
+		end
+		return Path
+	end
+	
+	function Rspy.GenCode()
+		RspyUI.Main.Stack.Visible = false
+		RspyUI.Main.Code.Visible = true
+		
+		local CurrentInfo = Rspy.CurrentInfo
+		
+		local str = `local args = {Rspy.TableToString(CurrentInfo.Args)}`
+		str = str .. "\n\n"
+		str = str .. string.format(Rspy.Methods[CurrentInfo.Method], Rspy.GetPath(CurrentInfo.Remote))
+		
+		Rspy.CodeBox:setRaw(str)
+	end
+	
+	function Rspy.ReturnValue()
+		RspyUI.Main.Stack.Visible = false
+		RspyUI.Main.Code.Visible = true
+		
+		local CurrentInfo = Rspy.CurrentInfo
+
+		local str = `local ReturnValue = {Rspy.TableToString(CurrentInfo.ReturnValue)}`
+
+		Rspy.CodeBox:setRaw(str)
+	end
+	
+	function Rspy.CallStack()
+		RspyUI.Main.Stack.Visible = true
+		RspyUI.Main.Code.Visible = false
+		
+		local CurrentInfo = Rspy.CurrentInfo
+		
+		for i,v in RspyUI.Main.Stack:GetChildren() do
+			if v:IsA("TextButton") then
+				v:Destroy()
+			end
+		end
+		
+		for i,v in CurrentInfo.CallStack do
+			local NewButton = RspyUI.Main.Stack.UIListLayout.TextButton:Clone()
+			NewButton.FunctionName = v.n
+			NewButton.CallingScript = v.s
+			
+			NewButton.Parent = RspyUI.Main.Stack
+			
+			NewButton.MouseButton1Click:Connect(function()
+				Rspy.CodeBox:setRaw(Rspy.TableToString(v.f))
+			end)
+		end
+	end
+	
+	local MethodNormal = {
+		fireserver = "FireServer",
+		invokeserver = "InvokeServer",
+		onclientinvoke = "OnClientInvoke",
+		onclientevent = "OnClientEvent",
+		httpget = "HttpGet",
+	}
+	
+	function Rspy.Log(Remote,Method,args,returnvalue)
+		local NewButton = RspyUI.List.ScrollingFrame.UIListLayout.TextButton:Clone()
+		
+		NewButton.RemoteName.Text = Remote.Name
+		NewButton.Tick.Text = os.date("%X")
+		
+		NewButton.Frame.BackgroundColor3 = Rspy.Colors[Method] or Color3.fromRGB(255, 255, 255)
+		
+		local CallStack = {}
+		
+		for level = 2, 30 do
+			local s, n, f = debug.info(level, "snf")
+			if not s then break end
+			table.insert(CallStack, { s = s, n = n, f = f })
+		end
+		NewButton.MouseButton1Click:Connect(function()
+			Rspy.CurrentInfo = {
+				Remote = Remote,
+				Method = Method,
+				Args = args,
+				ReturnValue = returnvalue,
+				CallStack = CallStack
+			}
+			
+			RspyUI.Main.Method.Text = `{MethodNormal[Method] or Method}  ·  {Remote.Name}`
+			RspyUI.Main.Path.Text = Rspy.GetPath(Remote)
+			
+			Rspy.GenCode()
+		end)
+		
+		NewButton.Parent = RspyUI.List.ScrollingFrame
+	end
+	
+	local CallbackOwners = setmetatable({}, { __mode = "k" })
+	local ConnectCache = setmetatable({}, { __mode = "k" })
+	
+	local function ResolveCallable(Value)
+		if typeof(Value) == "function" then
+			return Value
+		end
+
+		local ok, mt = pcall(getrawmetatable, Value)
+		if not ok or not mt then return nil end
+
+		local hasCall, call = pcall(rawget, mt, "__call")
+		return (hasCall and typeof(call) == "function") and call or nil
+	end
+	
+	local function CreateDetour(Instance, Method, Callback)
+		local Original = assert(ResolveCallable(Callback), "callback not callable")
+		local IsDirect = rawequal(Callback, Original)
+
+		local Detour = function(...)
+			local Origin
+			if getscriptfromthread then
+				Origin = getscriptfromthread(coroutine.running())
+			end
+			if not Origin then
+				local S = rawget(getfenv(Original), "script")
+				if typeof(S) == "Instance" then Origin = S end
+			end
+
+			local args = table.pack(...)
+
+			local InitEnv, InitIdentity = getfenv(0), getthreadidentity()
+
+			setthreadidentity(2)
+			setfenv(0, getfenv(Original))
+			
+			local success, results = pcall(function()
+				if IsDirect then
+					return table.pack(Original(table.unpack(args)))
+				else
+					return table.pack(Original(Callback, table.unpack(args)))
+				end
+			end)
+
+			if not success then
+				setfenv(0, InitEnv)
+				setthreadidentity(InitIdentity)
+				pcall(Rspy.Log, Instance, "onclientinvoke", args, nil)
+				error(results, 0)
+			end
+			
+			setfenv(0, InitEnv)
+			setthreadidentity(InitIdentity)
+			
+			pcall(Rspy.Log, Instance, "onclientinvoke", args, results)
+			return table.unpack(results, 1, results.n)
+		end
+
+		if setstackhidden then
+			pcall(setstackhidden, Detour, true)
+		end
+
+		CallbackOwners[Detour] = {
+			Original = Callback,
+			Instance = Instance,
+			Method   = Method,
+		}
+
+		return Detour
+	end
+
+	local function WrapAssignment(Instance, Method, Value)
+		if typeof(Value) ~= "function" and ResolveCallable(Value) == nil then
+			return Value
+		end
+
+		if CallbackOwners[Value] then
+			return Value
+		end
+
+		return CreateDetour(Instance, Method, Value)
+	end
+	
+	function Rspy.Init()
+		local othhook = oth.hook
+		
+		local InstanceRaw = getrawmetatable(game)
+		local tr = Instance.new("RemoteEvent")
+		local SignalRaw = getrawmetatable(tr.OnClientEvent)
+		
+		local NameCall;NameCall = othhook(rawget(InstanceRaw,"__namecall"), function(self, ...)
+			local method = string.lower(getnamecallmethod() or "")
+			
+			local args = {...}
+			
+			if method and self and typeof(self) == "Instance" then
+				local Remote = cloneref(self)
+				if (
+					method == "fireserver" and 
+						(
+							Remote:IsA("RemoteEvent") or 
+							Remote:IsA("UnreliableRemoteEvent")
+						)
+					) or 
+						(
+							method == "invokeserver" and 
+							Remote:IsA("RemoteFunction")
+						) then
+					
+					local returnvalue = NameCall(self, table.unpack(args))
+					
+					pcall(Rspy.Log,self,method,args,returnvalue)
+
+					return returnvalue
+				end
+			end
+			
+			return NameCall(self, ...)
+		end)
+		
+		local NewIndex;NewIndex = othhook(rawget(InstanceRaw,"__newindex"), function(...)
+			local self, key, value = ...
+
+			if typeof(self) == "Instance" and self.ClassName == "RemoteFunction" then
+				local Method = "onclientinvoke"
+				if string.lower(key or "") == Method then
+					return NewIndex(self, key, WrapAssignment(self, Method, value))
+				end
+			end
+
+			return NewIndex(...)
+		end)
+		
+		local function RegisterSignal(Instance)
+			local Signal = Instance["OnClientEvent"]
+			if Signal and not ConnectCache[Signal] then
+				ConnectCache[Signal] = Signal:Connect(function(...)
+					pcall(Rspy.Log, Instance, "onclientevent", table.pack(...))
+				end)
+			end
+		end
+
+		local function HookRF(obj)
+			local Method = "onclientinvoke"
+			local ok, cb = pcall(getcallbackvalue, obj, "OnClientInvoke")
+			if not ok or cb == nil or CallbackOwners[cb] then return end
+			if ResolveCallable(cb) == nil then return end
+
+			local InitEnv = getfenv(cb)
+			local InitScript = rawget(InitEnv, "script")
+
+			local assign = function()
+				obj.OnClientInvoke = CreateDetour(obj, Method, cb)
+			end
+
+			if trampoline_call then
+				trampoline_call(assign, {}, {
+					env      = InitEnv,
+					script   = InitScript,
+					identity = 2,
+				})
+			else
+				task.spawn(function()
+					setthreadidentity(2)
+					setfenv(0, InitEnv)
+					assign()
+				end)
+			end
+		end
+		
+		for _, obj in ipairs(game:GetDescendants()) do
+			if obj:IsA("RemoteFunction") then
+				HookRF(obj)
+			elseif obj:IsA("RemoteEvent") or obj:IsA("UnreliableRemoteEvent") then
+				pcall(RegisterSignal, obj)
+			end
+		end
+		
+		game.DescendantAdded:Connect(function(obj)
+			if obj:IsA("RemoteFunction") then
+				task.defer(HookRF, obj)
+			elseif obj:IsA("RemoteEvent") or obj:IsA("UnreliableRemoteEvent") then
+				pcall(RegisterSignal, obj)
+			end
+		end)
+	end
+end
+
+--网易云
 do
 	type Song = {
 		Id: number,
