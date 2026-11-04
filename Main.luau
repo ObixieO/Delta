@@ -3207,7 +3207,7 @@ do
 			
 			local scr
 			
-			if getfenv(f) and rawget(getfenv(f)) then
+			if getfenv(f) and rawget(getfenv(f),"script") then
 				scr = Rspy.GetPath(rawget(getfenv(f),"script"))
 			else
 				scr = (debug.info(f, "s") or "nil")
