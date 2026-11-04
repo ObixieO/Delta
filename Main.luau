@@ -28,6 +28,7 @@ local Delta = {
 		},
 	},
 	Openned = true,
+	Misc = {},
 }
 
 local StarterGui = game:GetService("StarterGui")
@@ -63,6 +64,61 @@ local function GetInScreenPosition(Position, Size)
 		math.clamp(Position.X, 0, math.max(0, screenSize.X - Size.X)),
 		math.clamp(Position.Y, 0, math.max(0, screenSize.Y - Size.Y))
 	)
+end
+
+local function fmtTime(sec)
+	if type(sec) ~= "number" or sec ~= sec then return "0:00" end
+	sec = math.max(0, math.floor(sec))
+
+	local d = math.floor(sec / 86400)
+	local h = math.floor((sec % 86400) / 3600)
+	local m = math.floor((sec % 3600) / 60)
+	local s = sec % 60
+
+	if d > 0 then
+		return string.format("%d:%02d:%02d:%02d", d, h, m, s)
+	elseif h > 0 then
+		return string.format("%d:%02d:%02d", h, m, s)
+	else
+		return string.format("%d:%02d", m, s)
+	end
+end
+
+local function md5(msg)
+	local function band(a,b) local r,p=0,1 for _=1,32 do local x,y=a%2,b%2 if x==1 and y==1 then r=r+p end a=(a-x)/2 b=(b-y)/2 p=p*2 end return r end
+	local function bor(a,b) local r,p=0,1 for _=1,32 do local x,y=a%2,b%2 if x==1 or y==1 then r=r+p end a=(a-x)/2 b=(b-y)/2 p=p*2 end return r end
+	local function bxor(a,b) local r,p=0,1 for _=1,32 do local x,y=a%2,b%2 if x~=y then r=r+p end a=(a-x)/2 b=(b-y)/2 p=p*2 end return r end
+	local function lrot(x,c) return (x*2^c)%2^32 + math.floor(x/2^(32-c)) end
+	local function add(a,b) return (a+b)%2^32 end
+	local s = {7,12,17,22,7,12,17,22,7,12,17,22,7,12,17,22,
+		5,9,14,20,5,9,14,20,5,9,14,20,5,9,14,20,
+		4,11,16,23,4,11,16,23,4,11,16,23,4,11,16,23,
+		6,10,15,21,6,10,15,21,6,10,15,21,6,10,15,21}
+	local K = {}
+	for i=1,64 do K[i]=math.floor(math.abs(math.sin(i))*2^32) end
+	local len = #msg * 8
+	msg = msg .. "\128" .. string.rep("\0", (56 - (#msg+1) % 64) % 64)
+	msg = msg .. string.pack("<I8", len)
+	local a0,b0,c0,d0 = 0x67452301,0xefcdab89,0x98badcfe,0x10325476
+	for chunk=1,#msg,64 do
+		local M = {}
+		for i=1,16 do M[i] = string.unpack("<I4", msg, chunk+(i-1)*4) end
+		local A,B,C,D = a0,b0,c0,d0
+		for i=1,64 do
+			local F,g
+			if i<=16 then F=bor(band(B,C),band(bxor(B,0xffffffff),D)); g=i-1
+			elseif i<=32 then F=bor(band(D,B),band(bxor(D,0xffffffff),C)); g=(5*(i-1)+1)%16
+			elseif i<=48 then F=bxor(bxor(B,C),D); g=(3*(i-1)+5)%16
+			else F=bxor(C,bor(B,bxor(D,0xffffffff))); g=(7*(i-1))%16 end
+			local tmp = D
+			D = C
+			C = B
+			B = add(B, lrot(add(add(A,F),add(K[i],M[g+1])), s[i]))
+			A = tmp
+		end
+		a0=add(a0,A); b0=add(b0,B); c0=add(c0,C); d0=add(d0,D)
+	end
+	return string.pack("<I4I4I4I4", a0,b0,c0,d0)
 end
 
 if RunService:IsStudio() then
@@ -617,6 +673,10 @@ function Delta:Init()
 			v.MouseButton1Click:Connect(function()
 				if Delta.Ui.ContentIsland.Main:FindFirstChild(v.Name) then
 					Delta:TogglePage(v.Name)
+					
+					if Delta[v.Name] and Delta[v.Name].Init then
+						Delta[v.Name]:Init()
+					end
 				end
 			end)
 		end
@@ -980,6 +1040,35 @@ function Delta:Init()
 
 	for i,v in Delta.DeltaUi do
 		v.Enabled = false
+	end
+	
+	for i,v in Delta.Misc do
+		if v.Init then
+			v.Init()
+		end
+	end
+	
+	local MiscUi = Delta.Ui.ContentIsland.Main.something
+	
+	for i,v in MiscUi.Tabs:GetChildren() do
+		if v:IsA("TextButton") and MiscUi.Frame:FindFirstChild(v.Name) then
+			v.MouseButton1Click:Connect(function()
+				local Page = v.Name
+				for i,v in MiscUi.Tabs:GetChildren() do
+					if v:IsA("TextButton") then
+						Tween(v,{.1},{
+							BackgroundColor3 = v.Name == Page and Color3.fromRGB(120, 180, 255) or Color3.fromRGB(28, 32, 46),
+							BackgroundTransparency = v.Name == Page and 0.55 or 0.75,
+							TextColor3 = v.Name == Page and Color3.fromRGB(240, 244, 255) or Color3.fromRGB(150, 160, 190),
+						})
+						Tween(v.UIStroke,{.1},{
+							Transparency = v.Name == Page and 0.2 or 0.8,
+						})
+					end
+				end
+				MiscUi.Frame.UIPageLayout:JumpTo(MiscUi.Frame:FindFirstChild(v.Name))
+			end)
+		end
 	end
 end
 
@@ -2119,5 +2208,510 @@ Highlighter.builtIns = builtIns
 Highlighter.executorFuncs = executorFuncs
 Highlighter.executorSubTables = executorSubTables
 Highlighter.DEFAULT_COLORS = DEFAULT_COLORS
+
+
+
+
+-----------------------------------------------------------
+--  杂项
+-----------------------------------------------------------
+
+local MiscUi = Delta.Ui.ContentIsland.Main.something
+
+do
+	type Song = {
+		Id: number,
+		Name: string,
+		Author: string,
+		Length: number,
+		Loved: boolean,
+		SoundId: string,
+		ImageId: string,
+	}
+
+	local WYY = {
+		PlayingSong = nil :: Song?,
+		CachedSong = {} :: { [number]: Song }, 
+		Loved = {} :: { [number]: Song },
+		SongList = {} :: { string },
+	}
+
+	Delta.Misc["网易云"] = WYY
+	
+	local WYYUI = MiscUi.Frame.WYY
+
+	local function GetLoved()
+		if not isfolder("music163/Loved") then
+			makefolder("music163/Loved")
+		end
+		local loved = listfiles("music163/Loved")
+		
+		for i, v in ipairs(loved) do
+			loved[i] = string.sub(v,#("music163/Loved/")+1)
+		end
+		
+		return loved
+	end
+	
+	local function IsLoved(Id)
+		local Id = tostring(Id)
+		local Cached = GetLoved()
+		if table.find(Cached, Id) then
+			return true
+		end
+	end
+
+	local function urlEncode(s)
+		return tostring(s or ""):gsub("([^%w%-_%.~])", function(c)
+			return string.format("%%%02X", string.byte(c))
+		end)
+	end
+
+	local function GetThumb(ImageId)
+		if isfile(`music163/Cached/{ImageId}_thumb.jpg`) then
+			return getcustomasset(`music163/Cached/{ImageId}_thumb.jpg`)
+		end
+
+		local MAGIC = "3go8&$8*3*3h0k(2)2"
+
+		local id = tostring(ImageId)
+		local key = {}
+		for i = 1, #id do
+			local m = MAGIC:byte((i-1) % #MAGIC + 1)
+			key[i] = string.char(bit32.bxor(m, id:byte(i)))
+		end
+		local raw = md5(table.concat(key))
+		local B64C = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+		local out = {}
+		for i = 1, #raw, 3 do
+			local a,b,c = raw:byte(i, i+2)
+			local n = (a or 0)*65536 + (b or 0)*256 + (c or 0)
+			out[#out+1] = B64C:sub(math.floor(n/262144)%64 + 1, math.floor(n/262144)%64 + 1)
+			out[#out+1] = B64C:sub(math.floor(n/4096)%64 + 1, math.floor(n/4096)%64 + 1)
+			out[#out+1] = b and B64C:sub(math.floor(n/64)%64 + 1, math.floor(n/64)%64 + 1) or "="
+			out[#out+1] = c and B64C:sub(n%64 + 1, n%64 + 1) or "="
+		end
+		local b64 = table.concat(out):gsub("/","_"):gsub("+","-")
+
+		writefile(`music163/Cached/{ImageId}_thumb.jpg`,game:HttpGet(`https://p1.music.126.net/{b64}/{id}.jpg?param=130y130`))
+
+		return getcustomasset(`music163/Cached/{ImageId}_thumb.jpg`)
+	end
+
+	function WYY.Search(keywords, limit, offset)
+		local api = `https://music.163.com/api/search/get/web?csrf_token=&type=1&offset={tostring(offset or 0)}&total=true&s={urlEncode(keywords)}&limit={tostring(limit or 10)}`
+		local Result = game:HttpGet(api)
+
+		if Result then
+			local Info = HttpService:JSONDecode(Result)
+			if Info then
+				Info = Info.result.songs
+
+				local Songs = {}
+
+				for _, v in Info do
+					table.insert(Songs,{
+						Id = v.id,
+						Name = v.name,
+						Author = v.artists[1].name,
+						ImageId = GetThumb(v.album.picId),
+						Length = v.duration/1000,
+					})
+				end
+
+				return Songs
+			end
+		end
+	end
+
+
+	function WYY.GetSongInfo(ID)
+		ID = tonumber(ID)
+		if WYY.CachedSong[ID] then
+			return WYY.CachedSong[ID]
+		elseif isfile(`music163/Cached/{ID}`) then
+			local Result = HttpService:JSONDecode(readfile(`music163/Cached/{ID}`))
+			Result.SoundId = getcustomasset(`music163/Cached/{ID}.mp3`)
+			Result.ImageId = getcustomasset(`music163/Cached/{ID}.jpg`)
+
+			Result.Loved = isfile(`music163/Loved/{ID}`)
+
+			WYY.CachedSong[ID] = Result
+			return Result
+		end
+
+		local Api = `http://music.163.com/api/song/detail/?id={ID}&ids=[{ID}]`
+
+		local Result = game:HttpGet(Api)
+
+		if Result then
+			local Info = HttpService:JSONDecode(Result)
+			if Info then
+				Info = Info.songs[1]
+
+				if not isfile(`music163/Cached/{ID}.jpg`) then
+					writefile(`music163/Cached/{ID}.jpg`,game:HttpGet(Info.album.picUrl))
+				end
+
+
+				local NewSong : Song = {
+					SoundId = WYY.GetSongId(ID,Info.fee ~= 0),
+					ImageId = getcustomasset(`music163/Cached/{ID}.jpg`),
+					Id = Info.id,
+					Name = Info.name,
+					Author = Info.artists[1].name,
+					Length = Info.duration/1000,
+					Loved = isfile(`music163/Loved/{ID}`)
+				}
+
+				WYY.CachedSong[ID] = NewSong
+
+				writefile(`music163/Cached/{ID}`,HttpService:JSONEncode(NewSong))
+
+				return NewSong
+			end
+		end
+	end
+
+	function WYY.GetSongId(Id,VIP)
+		if WYY.CachedSong[Id] then
+			return WYY.CachedSong[Id].SoundId
+		end
+		if isfile(`music163/Cached/{Id}.mp3`) then
+			return getcustomasset(`music163/Cached/{Id}.mp3`)
+		end
+
+		local Api
+		if VIP then
+			Api = `https://api.qijieya.cn/meting/?server=netease&type=url&id={Id}`
+		else
+			Api = `http://music.163.com/song/media/outer/url?id={tostring(Id)}.mp3`
+		end
+
+		local Success, Result = pcall(game.HttpGet,game,Api)
+		if Success and Result then
+			writefile(`music163/Cached/{Id}.mp3`,Result)
+		end
+
+		return getcustomasset(`music163/Cached/{Id}.mp3`)
+	end
+
+	function WYY.TogglePage(Page)
+		if Page ~= "列表" then
+			WYY.CurrentPage = Page
+		end
+	
+		for i,v in WYYUI.List.Buttons:GetChildren() do
+			if v:IsA("TextButton") then
+				Tween(v,{.1},{
+					BackgroundColor3 = v.Name == Page and Color3.fromRGB(194, 12, 12) or Color3.fromRGB(246, 246, 248),
+					TextColor3 = v.Name == Page and Color3.fromRGB(255,255,255) or Color3.fromRGB(51, 51, 51)
+				})
+			end
+		end
+		
+		for i,v in WYYUI.Pages:GetChildren() do
+			v.Visible = v.Name == Page
+		end
+	end
+	
+	function WYY.Play(ID)
+		ID = tostring(ID)
+		local SongInfo = WYY.GetSongInfo(ID)
+		if SongInfo then
+			if not table.find(WYY.SongList,ID) then
+				table.insert(WYY.SongList,ID)
+			end
+			
+			WYY.PlayingSong = SongInfo
+			
+			WYYUI.Frame.SongName.Text = SongInfo.Name
+			WYYUI.Frame.Author.Text = SongInfo.Author
+			WYYUI.Frame.Image.Frame.ImageLabel.Image = SongInfo.ImageId
+			WYYUI.Frame.Image.Frame.ImageLabel.Rotation = 0
+			WYYUI.Frame.Love.Text = IsLoved(ID) and "❤" or "♡"
+			
+			WYYUI.Sound.SoundId = SongInfo.SoundId
+			WYYUI.Sound.TimePosition = 0
+			
+			WYYUI.Sound:Play()
+		end
+	end
+	
+	function WYY.ShowList(List)
+		for i,v in WYYUI.Pages["列表"].ScrollingFrame:GetChildren() do
+			if v:IsA("TextButton") then
+				v:Destroy()
+			end
+		end
+		
+		for _,id in List do
+			local Info = WYY.GetSongInfo(id)
+			
+			local NewSongButton = WYYUI.Song:Clone()
+			NewSongButton.SongName.Text = Info.Name
+			NewSongButton.TextButton.Text = Info.Author
+			NewSongButton.Length.Text = fmtTime(Info.Length)
+			NewSongButton.ImageLabel.Image = Info.ImageId
+
+			NewSongButton.Parent = WYYUI.Pages["列表"].ScrollingFrame
+
+			NewSongButton.MouseButton1Click:Connect(function()
+				WYY.Play(Info.Id)
+			end)
+		end
+		
+		WYY.TogglePage("列表")
+	end
+
+	function WYY.Init()
+		local SearchOffset = 0
+		local SearchText = WYYUI.Top.Search.TextBox.Text
+		
+		
+		WYYUI.Pages["列表"].TextButton.MouseButton1Click:Connect(function()
+			if WYY.CurrentPage then
+				WYY.TogglePage(WYY.CurrentPage)
+			end
+		end)
+		WYYUI.Sound:GetPropertyChangedSignal("TimePosition"):Connect(function()
+			WYYUI.Frame.Player.TextLabel.Text = `{fmtTime(WYYUI.Sound.TimePosition)}/{fmtTime(WYYUI.Sound.TimeLength)}`
+			
+			local tl = WYYUI.Sound.TimeLength
+			local v = (tl > 0) and math.clamp(WYYUI.Sound.TimePosition / tl, 0, 1) or 0
+			
+			WYYUI.Frame.Player.TextButton.Frame.Size = UDim2.fromScale(v,1)
+			WYYUI.Frame.Player.TextButton.Point.Position = UDim2.fromScale(v,.5)
+		end)
+		WYYUI.Sound:GetPropertyChangedSignal("IsPlaying"):Connect(function()
+			WYYUI.Frame.Player.Frame.TextButton.Text = WYYUI.Sound.IsPlaying and "II" or "▶"
+		end)
+		WYYUI.Sound:GetPropertyChangedSignal("PlaybackSpeed"):Connect(function()
+			local v = WYYUI.Sound.PlaybackSpeed/3
+			
+			local Display = math.floor(WYYUI.Sound.PlaybackSpeed * 100) / 100
+			
+			WYYUI.Rate.CurrentRate.Text = `{Display}x`
+			WYYUI.Frame.Rate.Text = `{Display}x`
+			
+			WYYUI.Rate.Scroll.Frame.Size = UDim2.fromScale(v,1)
+			WYYUI.Rate.Scroll.Frame.Point.Position = UDim2.fromScale(v,.5)
+		end)
+		
+		RunService.RenderStepped:Connect(function(dt)
+			if WYYUI.Sound.IsPlaying then
+				WYYUI.Frame.Image.Frame.ImageLabel.Rotation += dt * 10
+			end
+		end)
+		
+		local btn = WYYUI.Frame.Player.TextButton
+		btn.MouseButton1Down:Connect(function()
+			local ratioX
+			local function update()
+				local mouse = UserInputService:GetMouseLocation()
+				local mx = mouse.X
+
+				ratioX = math.clamp(
+					(mx - btn.AbsolutePosition.X) / math.max(1, btn.AbsoluteSize.X),
+					0, 1
+				)
+				
+				WYYUI.Frame.Player.TextButton.Frame.Size = UDim2.fromScale(ratioX,1)
+				WYYUI.Frame.Player.TextButton.Point.Position = UDim2.fromScale(ratioX,.5)
+			end
+
+			update()
+
+			local a = RunService.RenderStepped:Connect(update)
+
+			local b;b = UserInputService.InputEnded:Connect(function(input)
+				if input.UserInputType == Enum.UserInputType.MouseButton1
+					or input.UserInputType == Enum.UserInputType.Touch then
+					if WYYUI.Sound.TimeLength > 0 and ratioX then
+						WYYUI.Sound.TimePosition = WYYUI.Sound.TimeLength * ratioX
+					end
+					
+					a:Disconnect()
+					b:Disconnect()
+				end
+			end)
+		end)
+		
+		local function AddSearchSongs(Offset)
+			local List = WYY.Search(SearchText,10,Offset)
+			
+			for i,v in List do
+				local NewSongButton = WYYUI.Song:Clone()
+				NewSongButton.SongName.Text = v.Name
+				NewSongButton.TextButton.Text = v.Author
+				NewSongButton.Length.Text = fmtTime(v.Length)
+				NewSongButton.ImageLabel.Image = v.ImageId
+				
+				NewSongButton.Parent = WYYUI.Pages["搜索"].ScrollingFrame
+				
+				NewSongButton.MouseButton1Click:Connect(function()
+					WYY.Play(v.Id)
+				end)
+			end
+		end
+		
+		for i,v in WYY.Search("热歌",50,0) do
+			local NewSongButton = WYYUI.Song:Clone()
+			NewSongButton.SongName.Text = v.Name
+			NewSongButton.TextButton.Text = v.Author
+			NewSongButton.Length.Text = fmtTime(v.Length)
+			NewSongButton.ImageLabel.Image = v.ImageId
+			
+			NewSongButton.Parent = WYYUI.Pages["推荐"].ScrollingFrame
+			
+			NewSongButton.MouseButton1Click:Connect(function()
+				WYY.Play(v.Id)
+			end)
+		end
+		
+		WYYUI.Frame.Player.Frame.TextButton.MouseButton1Click:Connect(function()
+			if not WYY.PlayingSong then return end
+			
+			if WYYUI.Sound.IsPlaying then
+				WYYUI.Sound:Pause()
+			else
+				WYYUI.Sound:Resume()
+			end
+		end)
+		
+		WYYUI.Frame.Player.Last.MouseButton1Click:Connect(function()
+			if not WYY.PlayingSong then return end
+			local CurrentId = WYY.PlayingSong.Id
+			local index = table.find(WYY.SongList,tostring(CurrentId))
+			if index then
+				if index <= 1 then
+					index = #WYY.SongList
+				else
+					index -= 1
+				end
+				
+				WYY.Play(WYY.SongList[index])
+			end
+		end)
+		WYYUI.Frame.Player.New.MouseButton1Click:Connect(function()
+			if not WYY.PlayingSong then return end
+			local CurrentId = WYY.PlayingSong.Id
+			local index = table.find(WYY.SongList,tostring(CurrentId))
+			if index then
+				if index >= #WYY.SongList then
+					index = 1
+				else
+					index += 1
+				end
+				
+				WYY.Play(WYY.SongList[index])
+			end
+		end)
+		
+		WYYUI.Frame.Rate.MouseButton1Click:Connect(function()
+			WYYUI.Rate.Visible = not WYYUI.Rate.Visible
+		end)
+		WYYUI.Frame.Volume.MouseButton1Click:Connect(function()
+			WYYUI.Volume.Visible = not WYYUI.Volume.Visible
+		end)
+		
+		local ratebtn = WYYUI.Rate.TextButton
+		ratebtn.MouseButton1Down:Connect(function()
+			local ratioX
+			local function update()
+				local mouse = UserInputService:GetMouseLocation()
+				local mx = mouse.X
+
+				ratioX = math.clamp(
+					(mx - ratebtn.AbsolutePosition.X) / math.max(1, ratebtn.AbsoluteSize.X),
+					0, 1
+				)
+				
+				WYYUI.Rate.Scroll.Frame.Size = UDim2.fromScale(ratioX,1)
+				WYYUI.Rate.Scroll.Point.Position = UDim2.fromScale(ratioX,.5)
+			end
+
+			update()
+
+			local a = RunService.RenderStepped:Connect(update)
+
+			local b;b = UserInputService.InputEnded:Connect(function(input)
+				if input.UserInputType == Enum.UserInputType.MouseButton1
+					or input.UserInputType == Enum.UserInputType.Touch then
+					
+					WYYUI.Sound.PlaybackSpeed = math.floor(300 * ratioX)/100
+
+					a:Disconnect()
+					b:Disconnect()
+				end
+			end)
+		end)
+		
+		local volumebtn = WYYUI.Volume.TextButton
+		volumebtn.MouseButton1Down:Connect(function()
+			local ratioX
+			local function update()
+				local mouse = UserInputService:GetMouseLocation()
+				local mx = mouse.X
+
+				ratioX = math.clamp(
+					(mx - volumebtn.AbsolutePosition.X) / math.max(1, volumebtn.AbsoluteSize.X),
+					0, 1
+				)
+
+				WYYUI.Volume.Scroll.Frame.Size = UDim2.fromScale(ratioX,1)
+				WYYUI.Volume.Scroll.Point.Position = UDim2.fromScale(ratioX,.5)
+				WYYUI.Sound.Volume = math.floor(ratioX)
+				WYYUI.Volume.CurrentVolume.Text = math.floor(ratioX * 100) .. "%"
+			end
+
+			update()
+
+			local a = RunService.RenderStepped:Connect(update)
+
+			local b;b = UserInputService.InputEnded:Connect(function(input)
+				if input.UserInputType == Enum.UserInputType.MouseButton1
+					or input.UserInputType == Enum.UserInputType.Touch then
+					a:Disconnect()
+					b:Disconnect()
+				end
+			end)
+		end)
+		
+		WYYUI.Top.Search.TextBox.FocusLost:Connect(function(enter)
+			if enter then
+				for i,v in WYYUI.Pages["搜索"].ScrollingFrame:GetChildren() do
+					if v:IsA("TextButton") and v.Name ~= "LoadMore" then
+						v:Destroy()
+					end
+				end
+				
+				WYY.TogglePage("搜索")
+				
+				SearchOffset = 0
+				SearchText = WYYUI.Top.Search.TextBox.Text
+				
+				AddSearchSongs(SearchOffset)
+			end
+		end)
+		WYYUI.Pages["搜索"].ScrollingFrame.LoadMore.MouseButton1Click:Connect(function()
+			SearchOffset += 10
+			
+			AddSearchSongs(SearchOffset)
+		end)
+		WYYUI.List.Buttons["搜索"].MouseButton1Click:Connect(function()
+			WYY.TogglePage("搜索")
+		end)
+		WYYUI.List.Buttons["推荐"].MouseButton1Click:Connect(function()
+			WYY.TogglePage("推荐")
+		end)
+		WYYUI.List.Buttons["喜欢"].MouseButton1Click:Connect(function()
+			WYY.ShowList(GetLoved())
+		end)
+		WYYUI.List.Buttons["队列"].MouseButton1Click:Connect(function()
+			WYY.ShowList(WYY.SongList)
+		end)
+	end
+end
 
 Delta:Init()
