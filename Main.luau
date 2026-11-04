@@ -3198,15 +3198,20 @@ do
 				v:Destroy()
 			end
 		end
-		
-		for i,v in CurrentInfo.CallStack do
+
+		for i,f in CurrentInfo.CallStack do
+			local name = debug.info(f, "n")
+			name = (name and name ~= "") and name or "匿名函数"
 			local NewButton = RspyUI.Main.Stack.UIListLayout.TextButton:Clone()
-			NewButton.FunctionName.Text = v.n
-			NewButton.CallingScript.Text = v.s
+			NewButton.FunctionName.Text = name
+			NewButton.CallingScript.Text = (debug.info(f, "s") or "nil") .. ":" .. (debug.info(f, "l") or -1)
 			
 			NewButton.Parent = RspyUI.Main.Stack
 			
 			NewButton.MouseButton1Click:Connect(function()
+				RspyUI.Main.Stack.Visible = false
+				RspyUI.Main.Code.Visible = true
+				
 				Rspy.CodeBox:setRaw(Rspy.TableToString(v.f))
 			end)
 		end
@@ -3232,9 +3237,9 @@ do
 		local CallStack = {}
 
 		for level = 2, 30 do
-			local s, n, f = debug.info(level, "snf")
-			if not s then break end
-			table.insert(CallStack, { s = s, n = n, f = f })
+			local f = debug.info(level, "f")
+			if not f then break end
+			table.insert(CallStack, f)
 		end
 		
 		task.spawn(function()
@@ -3411,7 +3416,7 @@ do
 		
 		local IsA = game.IsA
 		
-		local NameCall;NameCall = hookmetamethod(game,"__namecall",newcclosure(function(...)
+		local NameCall;NameCall = othhook(rawget(InstanceRaw,"__namecall"),newcclosure(function(...)
 			local method = string.lower(getnamecallmethod() or "")
 
 			local args = {select(2,...)}
