@@ -3201,8 +3201,8 @@ do
 		
 		for i,v in CurrentInfo.CallStack do
 			local NewButton = RspyUI.Main.Stack.UIListLayout.TextButton:Clone()
-			NewButton.FunctionName = v.n
-			NewButton.CallingScript = v.s
+			NewButton.FunctionName.Text = v.n
+			NewButton.CallingScript.Text = v.s
 			
 			NewButton.Parent = RspyUI.Main.Stack
 			
