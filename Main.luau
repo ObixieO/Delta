@@ -2274,9 +2274,10 @@ do
 		end
 
 		if typeof(ImageId) == "string" then
-			writefile(`music163/Cached/{ImageId}_thumb.jpg`,game:HttpGet(ImageId))
+			local id = tonumber(ImageId:match("id=(%d+)"))
+			writefile(`music163/Cached/{id}_thumb.jpg`,game:HttpGet(ImageId))
 
-			return getcustomasset(`music163/Cached/{ImageId}_thumb.jpg`)
+			return getcustomasset(`music163/Cached/{id}_thumb.jpg`)
 		end
 
 		local MAGIC = "3go8&$8*3*3h0k(2)2"
@@ -2321,7 +2322,6 @@ do
 						Name = v.name,
 						Author = v.artist,
 						ImageId = GetThumb(v.pic),
-						--Length = v.duration/1000,
 					})
 				end
 
