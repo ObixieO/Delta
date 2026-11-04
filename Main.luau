@@ -3403,10 +3403,11 @@ do
 			setclipboard(Rspy.CodeBox:getRaw())
 		end)
 		
-		local NameCall;NameCall = othhook(rawget(InstanceRaw,"__namecall"), function(self, ...)
+		local NameCall;NameCall = othhook(rawget(InstanceRaw,"__namecall"), function(...)
 			local method = string.lower(getnamecallmethod() or "")
 			
-			local args = {...}
+			local args = {select(2,...)}
+			local self = ()
 			
 			if method and self and typeof(self) == "Instance" then
 				local Remote = cloneref(self)
@@ -3437,7 +3438,7 @@ do
 				end
 			end
 			
-			return NameCall(self, ...)
+			return NameCall(...)
 		end)
 		
 		local NewIndex;NewIndex = othhook(rawget(InstanceRaw,"__newindex"), function(...)
