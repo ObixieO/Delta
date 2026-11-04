@@ -3416,7 +3416,7 @@ do
 		
 		local IsA = game.IsA
 		
-		local NameCall;NameCall = othhook(rawget(InstanceRaw,"__namecall"),newcclosure(function(...)
+		local NameCall;NameCall = othhook(rawget(InstanceRaw,"__namecall"),(function(...)
 			local method = string.lower(getnamecallmethod() or "")
 
 			local args = {select(2,...)}
