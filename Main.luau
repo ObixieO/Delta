@@ -3431,11 +3431,11 @@ do
 						self.ClassName == "RemoteFunction"
 					) then
 					
-					local returnvalue = NameCall(...)
+					--local returnvalue = NameCall(...)
 
-					pcall(Rspy.Log,self,method,args,returnvalue)
+					pcall(Rspy.Log,self,method,args)
 					
-					return returnvalue
+					--return returnvalue
 				elseif method == "httpget" and self.ClassName == "DataModel" then
 					local returnvalue = NameCall(...)
 					
