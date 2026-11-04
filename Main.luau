@@ -3403,6 +3403,8 @@ do
 			setclipboard(Rspy.CodeBox:getRaw())
 		end)
 		
+		local IsA = game.IsA
+		
 		local NameCall;NameCall = othhook(rawget(InstanceRaw,"__namecall"), function(...)
 			local method = string.lower(getnamecallmethod() or "")
 			
@@ -3414,13 +3416,13 @@ do
 				if (
 					method == "fireserver" and 
 						(
-							Remote:IsA("RemoteEvent") or 
-							Remote:IsA("UnreliableRemoteEvent")
+							IsA(Remote,"RemoteEvent") or 
+							IsA(Remote,"UnreliableRemoteEvent")
 						)
 					) or 
 						(
 							method == "invokeserver" and 
-							Remote:IsA("RemoteFunction")
+							IsA(Remote,"RemoteFunction")
 						) then
 					
 					local returnvalue = NameCall(...)
