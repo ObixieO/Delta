@@ -3204,7 +3204,15 @@ do
 			name = (name and name ~= "") and name or "匿名函数"
 			local NewButton = RspyUI.Main.Stack.UIListLayout.TextButton:Clone()
 			NewButton.FunctionName.Text = name
-			NewButton.CallingScript.Text = (debug.info(f, "s") or "nil") .. ":" .. (debug.info(f, "l") or -1)
+			
+			local scr
+			
+			if getfenv(f) and rawget(getfenv(f)) then
+				scr = Rspy.GetPath(rawget(getfenv(f),"script"))
+			else
+				scr = (debug.info(f, "s") or "nil")
+			end
+			NewButton.CallingScript.Text = scr .. ":" .. (debug.info(f, "l") or -1)
 			
 			NewButton.Parent = RspyUI.Main.Stack
 			
@@ -3212,7 +3220,7 @@ do
 				RspyUI.Main.Stack.Visible = false
 				RspyUI.Main.Code.Visible = true
 				
-				Rspy.CodeBox:setRaw(Rspy.TableToString(v.f))
+				Rspy.CodeBox:setRaw(Rspy.TableToString(f))
 			end)
 		end
 	end
