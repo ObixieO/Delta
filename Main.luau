@@ -3414,22 +3414,27 @@ do
 			local self = (...)
 			
 			if method and self and typeof(self) == "Instance" then
-				if (
-					method == "fireserver" and 
+				if 
+					(
+						method == "fireserver" and 
 						(
 							self.ClassName == "RemoteEvent" or 
 							self.ClassName == "UnreliableRemoteEvent"
 						)
-					) or 
-						(
-							method == "invokeserver" and 
-							self.ClassName == "RemoteFunction"
-						) then
+					)
+				then
+					pcall(Rspy.Log,self,method,args) 
+					
+				elseif 
+					(
+						method == "invokeserver" and 
+						self.ClassName == "RemoteFunction"
+					) then
 					
 					local returnvalue = NameCall(...)
-					
-					pcall(Rspy.Log,self,method,args,returnvalue)
 
+					pcall(Rspy.Log,self,method,args,returnvalue)
+					
 					return returnvalue
 				elseif method == "httpget" and self.ClassName == "DataModel" then
 					local returnvalue = NameCall(...)
