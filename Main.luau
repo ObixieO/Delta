@@ -3424,6 +3424,7 @@ do
 					)
 				then
 					task.spawn(function()
+						pcall(setthreadidentity, 8)
 						pcall(Rspy.Log,self,method,args) 
 					end)
 					
@@ -3436,6 +3437,7 @@ do
 					local returnvalue = NameCall(...)
 
 					task.spawn(function()
+						pcall(setthreadidentity, 8)
 						pcall(Rspy.Log,self,method,args,returnvalue)
 					end)
 
