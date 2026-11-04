@@ -2725,8 +2725,7 @@ do
 		end)
 		
 		for i,v in WYY.Search("热歌",20,1) do
-			local Info = WYY.GetSongInfo(v)
-			WYY.NewSongButton(Info).Parent = WYYUI.Pages["推荐"].ScrollingFrame
+			WYY.NewSongButton(v).Parent = WYYUI.Pages["推荐"].ScrollingFrame
 		end
 	end
 end
