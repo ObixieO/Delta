@@ -3229,55 +3229,6 @@ do
 	local Clone = game.Clone
 	
 	function Rspy.Log(Remote,Method,args,returnvalue)
-		local targetcache
-		
-		if Method == "httpget" then
-			LogCache[Method] = LogCache[Method] or {}
-			if args[1] then
-				targetcache = LogCache[Method][args[1]] or {}
-				LogCache[Method][args[1]] = targetcache
-			end
-		elseif Method == "request" then
-			LogCache[Method] = LogCache[Method] or {}
-			if args[1] and args[1].Url then
-				targetcache = LogCache[Method][args[1].Url] or {}
-				LogCache[Method][args[1].Url] = targetcache
-			end
-		else
-			LogCache[Remote] = LogCache[Remote] or {}
-			targetcache = LogCache[Remote][Method] or {}
-			LogCache[Remote][Method] = targetcache
-		end
-		
-		if not targetcache then
-			return
-		end
-		
-		local NewButton = targetcache.Ui or Clone(RspyUI.List.ScrollingFrame.UIListLayout.Frame)
-		if not targetcache.Ui then
-			targetcache.Ui = NewButton
-			NewButton.Parent = RspyUI.List.ScrollingFrame
-			NewButton.TextButton.MouseButton1Click:Connect(function()
-				NewButton.Child.Visible = not NewButton.Child.Visible
-			end)
-		end
-		
-		local Now = tick()
-		local TextNow = os.date("%X")
-		targetcache.Tick = Now
-		
-		LogCounter += 1
-		NewButton.LayoutOrder = -LogCounter
-		NewButton.RemoteName.Text = 
-			(Method == "httpget" and args[1]) or 
-			(Method == "request" and args[1].Url) or 
-			(Remote.Name)
-		
-		NewButton.Tick.Text = TextNow
-		NewButton.Frame.BackgroundColor3 = Rspy.Colors[Method] or Color3.fromRGB(255, 255, 255)
-		
-		local NewChildButton = Clone(NewButton.Child.UIListLayout.Frame)
-		
 		local CallStack = {}
 
 		for level = 2, 30 do
@@ -3285,23 +3236,75 @@ do
 			if not s then break end
 			table.insert(CallStack, { s = s, n = n, f = f })
 		end
+		
+		task.spawn(function()
+			pcall(setthreadidentity, 8)
+			local targetcache
 
-		NewChildButton.Tick.Text = TextNow
-		NewChildButton.Parent = NewButton.Child
-		NewChildButton.LayoutOrder = -LogCounter
-		NewChildButton.TextButton.MouseButton1Click:Connect(function()
-			Rspy.CurrentInfo = {
-				Remote = Remote,
-				Method = Method,
-				Args = args,
-				ReturnValue = returnvalue,
-				CallStack = CallStack
-			}
-			
-			RspyUI.Main.Method.Text = `{MethodNormal[Method] or Method}  ·  {Remote.Name}`
-			RspyUI.Main.Path.Text = Rspy.GetPath(Remote)
-			
-			Rspy.GenCode()
+			if Method == "httpget" then
+				LogCache[Method] = LogCache[Method] or {}
+				if args[1] then
+					targetcache = LogCache[Method][args[1]] or {}
+					LogCache[Method][args[1]] = targetcache
+				end
+			elseif Method == "request" then
+				LogCache[Method] = LogCache[Method] or {}
+				if args[1] and args[1].Url then
+					targetcache = LogCache[Method][args[1].Url] or {}
+					LogCache[Method][args[1].Url] = targetcache
+				end
+			else
+				LogCache[Remote] = LogCache[Remote] or {}
+				targetcache = LogCache[Remote][Method] or {}
+				LogCache[Remote][Method] = targetcache
+			end
+
+			if not targetcache then
+				return
+			end
+
+			local NewButton = targetcache.Ui or Clone(RspyUI.List.ScrollingFrame.UIListLayout.Frame)
+			if not targetcache.Ui then
+				targetcache.Ui = NewButton
+				NewButton.Parent = RspyUI.List.ScrollingFrame
+				NewButton.TextButton.MouseButton1Click:Connect(function()
+					NewButton.Child.Visible = not NewButton.Child.Visible
+				end)
+			end
+
+			local Now = tick()
+			local TextNow = os.date("%X")
+			targetcache.Tick = Now
+
+			LogCounter += 1
+			NewButton.LayoutOrder = -LogCounter
+			NewButton.RemoteName.Text = 
+				(Method == "httpget" and args[1]) or 
+				(Method == "request" and args[1].Url) or 
+				(Remote.Name)
+
+			NewButton.Tick.Text = TextNow
+			NewButton.Frame.BackgroundColor3 = Rspy.Colors[Method] or Color3.fromRGB(255, 255, 255)
+
+			local NewChildButton = Clone(NewButton.Child.UIListLayout.Frame)
+
+			NewChildButton.Tick.Text = TextNow
+			NewChildButton.Parent = NewButton.Child
+			NewChildButton.LayoutOrder = -LogCounter
+			NewChildButton.TextButton.MouseButton1Click:Connect(function()
+				Rspy.CurrentInfo = {
+					Remote = Remote,
+					Method = Method,
+					Args = args,
+					ReturnValue = returnvalue,
+					CallStack = CallStack
+				}
+
+				RspyUI.Main.Method.Text = `{MethodNormal[Method] or Method}  ·  {Remote.Name}`
+				RspyUI.Main.Path.Text = Rspy.GetPath(Remote)
+
+				Rspy.GenCode()
+			end)
 		end)
 	end
 	
