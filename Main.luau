@@ -3407,7 +3407,7 @@ do
 			local method = string.lower(getnamecallmethod() or "")
 			
 			local args = {select(2,...)}
-			local self = ()
+			local self = (...)
 			
 			if method and self and typeof(self) == "Instance" then
 				local Remote = cloneref(self)
