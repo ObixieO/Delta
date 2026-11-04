@@ -3333,8 +3333,8 @@ do
 
 			local InitEnv, InitIdentity = getfenv(0), getthreadidentity()
 
-			--[[setthreadidentity(2)
-			setfenv(0, getfenv(Original))]]
+			setthreadidentity(2)
+			setfenv(0, getfenv(Original))
 			
 			local success, results = pcall(function()
 				if IsDirect then
@@ -3345,14 +3345,14 @@ do
 			end)
 
 			if not success then
-				--[[setfenv(0, InitEnv)
-				setthreadidentity(InitIdentity)]]
+				setfenv(0, InitEnv)
+				setthreadidentity(InitIdentity)
 				pcall(Rspy.Log, Instance, "onclientinvoke", args, nil)
 				error(results, 0)
 			end
 			
-			--[[setfenv(0, InitEnv)
-			setthreadidentity(InitIdentity)]]
+			setfenv(0, InitEnv)
+			setthreadidentity(InitIdentity)
 			
 			pcall(Rspy.Log, Instance, "onclientinvoke", args, results)
 			return table.unpack(results, 1, results.n)
@@ -3412,17 +3412,16 @@ do
 			local self = (...)
 			
 			if method and self and typeof(self) == "Instance" then
-				local Remote = cloneref(self)
 				if (
 					method == "fireserver" and 
 						(
-							IsA(Remote,"RemoteEvent") or 
-							IsA(Remote,"UnreliableRemoteEvent")
+							IsA(self,"RemoteEvent") or 
+							IsA(self,"UnreliableRemoteEvent")
 						)
 					) or 
 						(
 							method == "invokeserver" and 
-							IsA(Remote,"RemoteFunction")
+							IsA(self,"RemoteFunction")
 						) then
 					
 					local returnvalue = NameCall(...)
