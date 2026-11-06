@@ -1,9 +1,11 @@
+
 local DefaultScript = [[
 
 --忍者UI美化
 --By Obi_xieO
 
 ]]
+
 
 local Delta = {
 	UiTransparency = {},
@@ -675,7 +677,7 @@ function Delta:Init()
 			v.MouseButton1Click:Connect(function()
 				if Delta.Ui.ContentIsland.Main:FindFirstChild(v.Name) then
 					Delta:TogglePage(v.Name)
-					
+
 					if Delta[v.Name] and Delta[v.Name].Init then
 						Delta[v.Name]:Init()
 					end
@@ -1051,21 +1053,27 @@ function Delta:Init()
 	for i,v in Delta.DeltaUi do
 		v.Enabled = false
 	end
+
 	
-	if not RunService:IsStudio() then
-		for i,v in Delta.Misc do
-			if v.Init then
-				task.spawn(function()
-					xpcall(v.Init,function(m)
-						warn("Error: ",debug.traceback(m))
-					end)
+	for i,v in Delta.Misc do
+		if v.Init then
+			if RunService:IsStudio() then continue end
+			task.spawn(function()
+				xpcall(v.Init,function(m)
+					warn("Error: ",debug.traceback(m))
 				end)
-			end
+			end)
+		elseif v.Start then
+			task.spawn(function()
+				xpcall(v.Start,function(m)
+					warn("Error: ",debug.traceback(m))
+				end)
+			end)
 		end
 	end
-	
+
 	local MiscUi = Delta.Ui.ContentIsland.Main.something
-	
+
 	for i,v in MiscUi.Tabs:GetChildren() do
 		if v:IsA("TextButton") and MiscUi.Frame:FindFirstChild(v.Name) then
 			v.MouseButton1Click:Connect(function()
@@ -1088,469 +1096,477 @@ function Delta:Init()
 	end
 end
 
-local SmallConsole = {
-	Ui = Delta.Ui.SmallConsole
-}
-Delta.SmallConsole = SmallConsole
-
-function SmallConsole:AddConsoleMessage(Side,Message,MessageType)
-	local t = os.date("*t")
-	local str = string.format("%02d:%02d:%02d", t.hour, t.min, t.sec)
-
-	local Text = tostring(Message)
-	local NewText = SmallConsole.Ui.ConsoleText:Clone()
-
-	NewText.RichText = true
-	NewText.Text = string.format('<font color="#FFFFFF">[%s]</font> %s', str, Text)
-	NewText.TextSize = 12
-
-	NewText.TextColor3 =
-		(MessageType == Enum.MessageType.MessageError   and Color3.fromRGB(231, 87, 80))  or
-		(MessageType == Enum.MessageType.MessageWarning and Color3.fromRGB(245, 118, 48)) or
-		(MessageType == Enum.MessageType.MessageInfo    and Color3.fromRGB(107, 180, 255)) or
-		Color3.fromRGB(255, 255, 255)
-
-	if (MessageType == Enum.MessageType.MessageError) or (MessageType == Enum.MessageType.MessageWarning) then
-		local n = NewText.FontFace
-		n.Weight = Enum.FontWeight.ExtraBold
-		NewText.FontFace = n
-	end
-
-	NewText.Parent = SmallConsole.Ui:FindFirstChild(Side)
-end
-
-for i,v in SmallConsole.Ui.Frame.Buttons:GetChildren() do
-	if v:IsA("TextButton") then
-		local Page = SmallConsole.Ui:FindFirstChild(v.Name)
-
-		v.MouseButton1Click:Connect(function()
-			for i,n in SmallConsole.Ui.Frame.Buttons:GetChildren() do
-				if n:IsA("TextButton") then
-					Tween(n,{.1},{
-						BackgroundColor3 = n == v and Color3.fromRGB(120, 180, 255) or Color3.fromRGB(28, 32, 46)
-					})
-
-					Tween(n.UIStroke,{.1},{
-						Transparency = n == v and 0.2 or 0.7
-					})
-
-					SmallConsole.Ui:FindFirstChild(n.Name).Visible = n == v
-				end
-			end
-		end)
-
-		SmallConsole.Ui.Frame.Clear.MouseButton1Click:Connect(function()
-			for i,v in Page:GetChildren() do
-				if v:IsA("TextLabel") then
-					v:Destroy()
-				end
-			end
-		end)
-	end
-end
-
-Delta.Connections.ConsoleDrag = SmallConsole.Ui.Frame.InputBegan:Connect(function(input)
-	if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then return end
-	local MousePos = UserInputService:GetMouseLocation()
-	local ViewportSize = workspace.CurrentCamera.ViewportSize
-
-	local Offset = Vector2.new(
-		MousePos.X / ViewportSize.X - SmallConsole.Ui.Position.X.Scale,
-		MousePos.Y / ViewportSize.Y - SmallConsole.Ui.Position.Y.Scale
-	)
-
-	local R = RunService.RenderStepped:Connect(function()
-		local MousePos = UserInputService:GetMouseLocation()
-		local ViewportSize = workspace.CurrentCamera.ViewportSize
-
-		local TargetX = MousePos.X / ViewportSize.X - Offset.X
-		local TargetY = MousePos.Y / ViewportSize.Y - Offset.Y
-
-		local FinalPosition = UDim2.new(TargetX, 0, TargetY, 0)
-
-		Tween(SmallConsole.Ui, {0.1}, {
-			Position = FinalPosition
-		})
-	end)
-
-	local Release
-	Release = UserInputService.InputEnded:Connect(function(Input)
-		if Input.UserInputType == Enum.UserInputType.MouseButton1
-			or Input.UserInputType == Enum.UserInputType.Touch then
-			R:Disconnect()
-			Release:Disconnect()
-		end
-	end)
-end)
-
-local Settings = {
-	Ui = Delta.Ui.ContentIsland.Main.settings,
-	CurrentSettings = {
-
-	},
-}
-Delta.Settings = Settings
-Delta.DropdownConnections = {}
-
-function Settings:AddButton(Info,CallBack)
-	Info = {
-		Name = Info.Name or "Button",
-		Text = Info.Text,
+--小控制台
+do
+	local SmallConsole = {
+		Ui = Delta.Ui.SmallConsole
 	}
+	Delta.SmallConsole = SmallConsole
 
-	local NewButton = Settings.Ui.UIListLayout.Button:Clone()
+	function SmallConsole:AddConsoleMessage(Side,Message,MessageType)
+		local t = os.date("*t")
+		local str = string.format("%02d:%02d:%02d", t.hour, t.min, t.sec)
 
-	function Info:Set()
-		NewButton.TextLabel.Text = self.Name
-		if self.Text then
-			NewButton.SubText.Text = self.Text
-			NewButton.SubText.Visible = true
+		local Text = tostring(Message)
+		local NewText = SmallConsole.Ui.ConsoleText:Clone()
+
+		NewText.RichText = true
+		NewText.Text = string.format('<font color="#FFFFFF">[%s]</font> %s', str, Text)
+		NewText.TextSize = 12
+
+		NewText.TextColor3 =
+			(MessageType == Enum.MessageType.MessageError   and Color3.fromRGB(231, 87, 80))  or
+			(MessageType == Enum.MessageType.MessageWarning and Color3.fromRGB(245, 118, 48)) or
+			(MessageType == Enum.MessageType.MessageInfo    and Color3.fromRGB(107, 180, 255)) or
+			Color3.fromRGB(255, 255, 255)
+
+		if (MessageType == Enum.MessageType.MessageError) or (MessageType == Enum.MessageType.MessageWarning) then
+			local n = NewText.FontFace
+			n.Weight = Enum.FontWeight.ExtraBold
+			NewText.FontFace = n
 		end
+
+		NewText.Parent = SmallConsole.Ui:FindFirstChild(Side)
 	end
 
-	Info.Set(Info)
+	for i,v in SmallConsole.Ui.Frame.Buttons:GetChildren() do
+		if v:IsA("TextButton") then
+			local Page = SmallConsole.Ui:FindFirstChild(v.Name)
 
-	NewButton.Parent = Settings.Ui
+			v.MouseButton1Click:Connect(function()
+				for i,n in SmallConsole.Ui.Frame.Buttons:GetChildren() do
+					if n:IsA("TextButton") then
+						Tween(n,{.1},{
+							BackgroundColor3 = n == v and Color3.fromRGB(120, 180, 255) or Color3.fromRGB(28, 32, 46)
+						})
 
-	NewButton.TextButton.MouseButton1Click:Connect(function()
-		CallBack()
-	end)
+						Tween(n.UIStroke,{.1},{
+							Transparency = n == v and 0.2 or 0.7
+						})
 
-	return Info
-end
-
-local Dropdown = Delta.Ui.Dropdown
-
-function Settings:AddDropdown(Info, Callback)
-	if Info.CurrentOptions then
-		task.spawn(function()
-			Callback(Info.CurrentOptions,Info.CurrentOptions[1])
-		end)
-	end
-
-	Info = {
-		Name           = Info.Name or "Dropdown",
-		Text           = Info.Text,
-		Options        = Info.Options or {},
-		CurrentOptions = table.clone(Info.CurrentOptions or {}),
-		MultSelect     = Info.MultSelect or false,
-		CanNone        = Info.CanNone or false,
-	}
-
-	local T = {
-		bg      = Color3.fromRGB(30, 34, 48),
-		bgDark  = Color3.fromRGB(20, 22, 32),
-		text    = Color3.fromRGB(240, 244, 255),
-		subtext = Color3.fromRGB(150, 160, 190),
-		accent  = Color3.fromRGB(120, 180, 255),
-	}
-
-	local NewDropdown = Settings.Ui.UIListLayout.Dropdown:Clone()
-
-	local TriggerBtn = NewDropdown.TextButton
-	local Panel      = Dropdown.Dropdown.Panel
-	local Scroll     = Panel.Scroll
-	local Template   = Scroll.UIListLayout.Item
-
-	local Buttons      = {}
-	local IsOpen       = false
-
-	TriggerBtn.AutoButtonColor = true
-
-	local function contains(t, v)
-		for _, x in ipairs(t) do if x == v then return true end end
-		return false
-	end
-
-	local function UpdateTriggerText()
-		local cur = Info.CurrentOptions
-		if #cur == 0 then
-			TriggerBtn.Value.Text = "请选择..."
-			TriggerBtn.Value.TextColor3 = T.subtext
-		else
-			TriggerBtn.Value.Text = table.concat(cur, ", ")
-			TriggerBtn.Value.TextColor3 = T.text
-		end
-	end
-
-	local function SetSelectedVisual(btn, on)
-		Tween(btn, {.1}, {
-			BackgroundTransparency = on and .7 or 1,
-			BackgroundColor3       = on and T.accent or T.bg,
-		})
-
-		local frame = btn:FindFirstChild("Frame")
-		if frame then
-			if on then
-				frame.Visible = true
-				Tween(frame, {.1}, { BackgroundTransparency = 0 })
-			else
-				Tween(frame, {.1}, { BackgroundTransparency = 1 })
-				task.delay(.1, function()
-					if not contains(Info.CurrentOptions, btn:GetAttribute("Value")) then
-						frame.Visible = false
-					end
-				end)
-			end
-		end
-	end
-
-	local function ApplySelection(v)
-		if Info.MultSelect then
-			if contains(Info.CurrentOptions, v) then
-				if #Info.CurrentOptions == 1 and not Info.CanNone then
-					return
-				end
-				for i, x in ipairs(Info.CurrentOptions) do
-					if x == v then
-						table.remove(Info.CurrentOptions, i)
-						break
+						SmallConsole.Ui:FindFirstChild(n.Name).Visible = n == v
 					end
 				end
-			else
-				table.insert(Info.CurrentOptions, v)
-			end
-		else
-			if #Info.CurrentOptions == 1 and Info.CurrentOptions[1] == v then
-				if Info.CanNone then
-					Info.CurrentOptions = {}
-				else
-					return
+			end)
+
+			SmallConsole.Ui.Frame.Clear.MouseButton1Click:Connect(function()
+				for i,v in Page:GetChildren() do
+					if v:IsA("TextLabel") then
+						v:Destroy()
+					end
 				end
-			else
-				Info.CurrentOptions = { v }
-			end
-		end
-
-		local Ordered = {}
-		for _, opt in ipairs(Info.Options) do
-			if contains(Info.CurrentOptions, opt) then
-				table.insert(Ordered, opt)
-			end
-		end
-		Info.CurrentOptions = Ordered
-
-		for val, btn in pairs(Buttons) do
-			SetSelectedVisual(btn, contains(Info.CurrentOptions, val))
-		end
-		UpdateTriggerText()
-
-		if Callback then
-			task.spawn(function()
-				Callback(Info.CurrentOptions, Info.CurrentOptions[1])
 			end)
 		end
 	end
 
-	local function NewButton(v)
-		local item = Template:Clone()
-		item.Label.Text = tostring(v)
-		item:SetAttribute("Value", v)
-		item.Visible = true
+	Delta.Connections.ConsoleDrag = SmallConsole.Ui.Frame.InputBegan:Connect(function(input)
+		if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then return end
+		local MousePos = UserInputService:GetMouseLocation()
+		local ViewportSize = workspace.CurrentCamera.ViewportSize
 
-		local isSel = contains(Info.CurrentOptions, v)
-		item.BackgroundTransparency = isSel and .7 or 1
-		item.BackgroundColor3       = isSel and T.accent or T.bg
-		local frame = item:FindFirstChild("Frame")
-		if frame then frame.Visible = isSel; frame.BackgroundTransparency = isSel and 0 or 1 end
+		local Offset = Vector2.new(
+			MousePos.X / ViewportSize.X - SmallConsole.Ui.Position.X.Scale,
+			MousePos.Y / ViewportSize.Y - SmallConsole.Ui.Position.Y.Scale
+		)
 
-		item.MouseEnter:Connect(function()
-			if not contains(Info.CurrentOptions, v) then
-				Tween(item, {.1}, { BackgroundTransparency = .5 })
+		local R = RunService.RenderStepped:Connect(function()
+			local MousePos = UserInputService:GetMouseLocation()
+			local ViewportSize = workspace.CurrentCamera.ViewportSize
+
+			local TargetX = MousePos.X / ViewportSize.X - Offset.X
+			local TargetY = MousePos.Y / ViewportSize.Y - Offset.Y
+
+			local FinalPosition = UDim2.new(TargetX, 0, TargetY, 0)
+
+			Tween(SmallConsole.Ui, {0.1}, {
+				Position = FinalPosition
+			})
+		end)
+
+		local Release
+		Release = UserInputService.InputEnded:Connect(function(Input)
+			if Input.UserInputType == Enum.UserInputType.MouseButton1
+				or Input.UserInputType == Enum.UserInputType.Touch then
+				R:Disconnect()
+				Release:Disconnect()
 			end
 		end)
-		item.MouseLeave:Connect(function()
-			if contains(Info.CurrentOptions, v) then
-				Tween(item, {.1}, { BackgroundTransparency = .7 })
+	end)
+end
+
+
+--设置
+do
+
+	local Settings = {
+		Ui = Delta.Ui.ContentIsland.Main.settings,
+		CurrentSettings = {
+
+		},
+	}
+	Delta.Settings = Settings
+	Delta.DropdownConnections = {}
+
+	function Settings:AddButton(Info,CallBack)
+		Info = {
+			Name = Info.Name or "Button",
+			Text = Info.Text,
+		}
+
+		local NewButton = Settings.Ui.UIListLayout.Button:Clone()
+
+		function Info:Set()
+			NewButton.TextLabel.Text = self.Name
+			if self.Text then
+				NewButton.SubText.Text = self.Text
+				NewButton.SubText.Visible = true
+			end
+		end
+
+		Info.Set(Info)
+
+		NewButton.Parent = Settings.Ui
+
+		NewButton.TextButton.MouseButton1Click:Connect(function()
+			CallBack()
+		end)
+
+		return Info
+	end
+
+	local Dropdown = Delta.Ui.Dropdown
+
+	function Settings:AddDropdown(Info, Callback)
+		if Info.CurrentOptions then
+			task.spawn(function()
+				Callback(Info.CurrentOptions,Info.CurrentOptions[1])
+			end)
+		end
+
+		Info = {
+			Name           = Info.Name or "Dropdown",
+			Text           = Info.Text,
+			Options        = Info.Options or {},
+			CurrentOptions = table.clone(Info.CurrentOptions or {}),
+			MultSelect     = Info.MultSelect or false,
+			CanNone        = Info.CanNone or false,
+		}
+
+		local T = {
+			bg      = Color3.fromRGB(30, 34, 48),
+			bgDark  = Color3.fromRGB(20, 22, 32),
+			text    = Color3.fromRGB(240, 244, 255),
+			subtext = Color3.fromRGB(150, 160, 190),
+			accent  = Color3.fromRGB(120, 180, 255),
+		}
+
+		local NewDropdown = Settings.Ui.UIListLayout.Dropdown:Clone()
+
+		local TriggerBtn = NewDropdown.TextButton
+		local Panel      = Dropdown.Dropdown.Panel
+		local Scroll     = Panel.Scroll
+		local Template   = Scroll.UIListLayout.Item
+
+		local Buttons      = {}
+		local IsOpen       = false
+
+		TriggerBtn.AutoButtonColor = true
+
+		local function contains(t, v)
+			for _, x in ipairs(t) do if x == v then return true end end
+			return false
+		end
+
+		local function UpdateTriggerText()
+			local cur = Info.CurrentOptions
+			if #cur == 0 then
+				TriggerBtn.Value.Text = "请选择..."
+				TriggerBtn.Value.TextColor3 = T.subtext
 			else
-				Tween(item, {.1}, { BackgroundTransparency = 1 })
+				TriggerBtn.Value.Text = table.concat(cur, ", ")
+				TriggerBtn.Value.TextColor3 = T.text
 			end
-		end)
-
-		item.TextButton.MouseButton1Click:Connect(function()
-			ApplySelection(v)
-		end)
-
-		item.Parent = Scroll
-		Buttons[v] = item
-		return item
-	end
-
-	local function Refresh()
-		UpdateTriggerText()
-		if not IsOpen then return end
-
-		for _, btn in pairs(Buttons) do btn:Destroy() end
-		Buttons = {}
-		for _, v in ipairs(Info.Options) do
-			NewButton(v)
-		end
-	end
-
-	local SetOpen
-	SetOpen = function(open)
-		if Settings.DropdownRunning then return end
-		Settings.DropdownRunning = true
-
-		IsOpen = open
-
-		Refresh()
-
-		local GuiInsert = GuiService:GetGuiInset()
-		local FinalPos = GetInScreenPosition(TriggerBtn.AbsolutePosition+GuiInsert,Dropdown.Dropdown.AbsoluteSize + Vector2.new(0,Dropdown.Dropdown.Panel.AbsoluteSize.Y + 10))
-
-		Dropdown.Dropdown.Position = UDim2.fromOffset(FinalPos.X,FinalPos.Y)
-		Dropdown.Visible = true
-		if open then
-			Panel.Size = UDim2.new(1, 0, 0, 0)
 		end
 
-		local targetH = open and 130 or 0
+		local function SetSelectedVisual(btn, on)
+			Tween(btn, {.1}, {
+				BackgroundTransparency = on and .7 or 1,
+				BackgroundColor3       = on and T.accent or T.bg,
+			})
 
-		Tween(Panel, {.18}, { Size = UDim2.new(1, 0, 0, targetH) })
+			local frame = btn:FindFirstChild("Frame")
+			if frame then
+				if on then
+					frame.Visible = true
+					Tween(frame, {.1}, { BackgroundTransparency = 0 })
+				else
+					Tween(frame, {.1}, { BackgroundTransparency = 1 })
+					task.delay(.1, function()
+						if not contains(Info.CurrentOptions, btn:GetAttribute("Value")) then
+							frame.Visible = false
+						end
+					end)
+				end
+			end
+		end
 
-		task.delay(.2, function()
-			if not open then
-				Dropdown.Visible = false
-
-				for i,v in Dropdown.Dropdown.Panel.Scroll:GetChildren() do
-					if v:IsA("Frame") then
-						v:Destroy()
+		local function ApplySelection(v)
+			if Info.MultSelect then
+				if contains(Info.CurrentOptions, v) then
+					if #Info.CurrentOptions == 1 and not Info.CanNone then
+						return
 					end
+					for i, x in ipairs(Info.CurrentOptions) do
+						if x == v then
+							table.remove(Info.CurrentOptions, i)
+							break
+						end
+					end
+				else
+					table.insert(Info.CurrentOptions, v)
+				end
+			else
+				if #Info.CurrentOptions == 1 and Info.CurrentOptions[1] == v then
+					if Info.CanNone then
+						Info.CurrentOptions = {}
+					else
+						return
+					end
+				else
+					Info.CurrentOptions = { v }
 				end
 			end
 
-			Settings.DropdownRunning = false
-		end)
+			local Ordered = {}
+			for _, opt in ipairs(Info.Options) do
+				if contains(Info.CurrentOptions, opt) then
+					table.insert(Ordered, opt)
+				end
+			end
+			Info.CurrentOptions = Ordered
 
-		local arrow = TriggerBtn:FindFirstChild("Arrow")
-		if arrow then
-			Tween(arrow, {.18}, { Rotation = open and 0 or -90 })
+			for val, btn in pairs(Buttons) do
+				SetSelectedVisual(btn, contains(Info.CurrentOptions, val))
+			end
+			UpdateTriggerText()
+
+			if Callback then
+				task.spawn(function()
+					Callback(Info.CurrentOptions, Info.CurrentOptions[1])
+				end)
+			end
 		end
 
-		local a;a = Dropdown.MouseButton1Click:Connect(function()
+		local function NewButton(v)
+			local item = Template:Clone()
+			item.Label.Text = tostring(v)
+			item:SetAttribute("Value", v)
+			item.Visible = true
+
+			local isSel = contains(Info.CurrentOptions, v)
+			item.BackgroundTransparency = isSel and .7 or 1
+			item.BackgroundColor3       = isSel and T.accent or T.bg
+			local frame = item:FindFirstChild("Frame")
+			if frame then frame.Visible = isSel; frame.BackgroundTransparency = isSel and 0 or 1 end
+
+			item.MouseEnter:Connect(function()
+				if not contains(Info.CurrentOptions, v) then
+					Tween(item, {.1}, { BackgroundTransparency = .5 })
+				end
+			end)
+			item.MouseLeave:Connect(function()
+				if contains(Info.CurrentOptions, v) then
+					Tween(item, {.1}, { BackgroundTransparency = .7 })
+				else
+					Tween(item, {.1}, { BackgroundTransparency = 1 })
+				end
+			end)
+
+			item.TextButton.MouseButton1Click:Connect(function()
+				ApplySelection(v)
+			end)
+
+			item.Parent = Scroll
+			Buttons[v] = item
+			return item
+		end
+
+		local function Refresh()
+			UpdateTriggerText()
+			if not IsOpen then return end
+
+			for _, btn in pairs(Buttons) do btn:Destroy() end
+			Buttons = {}
+			for _, v in ipairs(Info.Options) do
+				NewButton(v)
+			end
+		end
+
+		local SetOpen
+		SetOpen = function(open)
 			if Settings.DropdownRunning then return end
-			SetOpen(false)
-			a:Disconnect()
+			Settings.DropdownRunning = true
+
+			IsOpen = open
+
+			Refresh()
+
+			local GuiInsert = GuiService:GetGuiInset()
+			local FinalPos = GetInScreenPosition(TriggerBtn.AbsolutePosition+GuiInsert,Dropdown.Dropdown.AbsoluteSize + Vector2.new(0,Dropdown.Dropdown.Panel.AbsoluteSize.Y + 10))
+
+			Dropdown.Dropdown.Position = UDim2.fromOffset(FinalPos.X,FinalPos.Y)
+			Dropdown.Visible = true
+			if open then
+				Panel.Size = UDim2.new(1, 0, 0, 0)
+			end
+
+			local targetH = open and 130 or 0
+
+			Tween(Panel, {.18}, { Size = UDim2.new(1, 0, 0, targetH) })
+
+			task.delay(.2, function()
+				if not open then
+					Dropdown.Visible = false
+
+					for i,v in Dropdown.Dropdown.Panel.Scroll:GetChildren() do
+						if v:IsA("Frame") then
+							v:Destroy()
+						end
+					end
+				end
+
+				Settings.DropdownRunning = false
+			end)
+
+			local arrow = TriggerBtn:FindFirstChild("Arrow")
+			if arrow then
+				Tween(arrow, {.18}, { Rotation = open and 0 or -90 })
+			end
+
+			local a;a = Dropdown.MouseButton1Click:Connect(function()
+				if Settings.DropdownRunning then return end
+				SetOpen(false)
+				a:Disconnect()
+			end)
+		end
+
+		function Info:Set()
+			NewDropdown.TextLabel.Text = self.Name
+
+			if self.Text then
+				NewDropdown.SubText.Text = self.Text
+				NewDropdown.SubText.Visible = true
+			end
+
+			Info = self
+
+			Refresh()
+		end
+
+		TriggerBtn.MouseButton1Click:Connect(function()
+			SetOpen(not IsOpen)
 		end)
-	end
 
-	function Info:Set()
-		NewDropdown.TextLabel.Text = self.Name
+		NewDropdown.Parent = Settings.Ui
 
-		if self.Text then
-			NewDropdown.SubText.Text = self.Text
-			NewDropdown.SubText.Visible = true
-		end
-
-		Info = self
-
-		Refresh()
-	end
-
-	TriggerBtn.MouseButton1Click:Connect(function()
-		SetOpen(not IsOpen)
-	end)
-
-	NewDropdown.Parent = Settings.Ui
-
-	Info.Refresh = Refresh
-	Info:Set()
-
-	return Info
-end
-
-function Settings:AddToggle(Info,Callback)
-	Info = {
-		Name = Info.Name or "Toggle",
-		Text = Info.Text,
-		Value = Info.Value or false,
-	}
-
-	local NewToggle = Settings.Ui.UIListLayout.Toggle:Clone()
-
-
-	function Info:Set()
-		NewToggle.TextLabel.Text = self.Name
-		if self.Text then
-			NewToggle.SubText.Text = self.Text
-			NewToggle.SubText.Visible = true
-		end
-
-		Tween(NewToggle.Frame,{.1},{
-			BackgroundColor3 = self.Value and Color3.fromRGB(130, 255, 180) or Color3.fromRGB(255, 130, 180),
-		})
-		Tween(NewToggle.Frame.Frame,{.1},{
-			Position = self.Value and UDim2.new(1,-3,0.5,0) or UDim2.new(0,3,0.5,0),
-			AnchorPoint = self.Value and Vector2.new(1,0.5) or Vector2.new(0,0.5)
-		})
-
-		if not Callback then return end
-		Callback(self.Value)
-	end
-
-	Info:Set()
-
-	NewToggle.Parent = Settings.Ui
-	NewToggle.Frame.TextButton.MouseButton1Click:Connect(function()
-		Info.Value = not Info.Value
+		Info.Refresh = Refresh
 		Info:Set()
-	end)
 
-	return Info
-end
-
-function Settings:AddNumber(Info,Callback)
-	Info = {
-		Name = Info.Name or "Number",
-		Text = Info.Text,
-		Value = Info.Value or 0,
-		Min = Info.Min or 0,
-		Max = Info.Max or math.huge,
-		Step = Info.Step or 1,
-	}
-
-	local NewNumber = Settings.Ui.UIListLayout.Number:Clone()
-
-	function Info:Set()
-		NewNumber.TextLabel.Text = Info.Name
-		if Info.Text then
-			NewNumber.SubText.Text = Info.Text
-			NewNumber.SubText.Visible = true
-		end
-
-		NewNumber.TextBox.Text = tostring(Info.Value)
-
-		if Callback then
-			Callback(Info.Value)
-		end
+		return Info
 	end
 
-	Info:Set()
+	function Settings:AddToggle(Info,Callback)
+		Info = {
+			Name = Info.Name or "Toggle",
+			Text = Info.Text,
+			Value = Info.Value or false,
+		}
 
-	NewNumber.Add.MouseButton1Click:Connect(function()
-		if math.min(Info.Value + Info.Step,Info.Max) == Info.Value then return end
-		Info.Value = math.min(Info.Value + Info.Step,Info.Max)
+		local NewToggle = Settings.Ui.UIListLayout.Toggle:Clone()
+
+
+		function Info:Set()
+			NewToggle.TextLabel.Text = self.Name
+			if self.Text then
+				NewToggle.SubText.Text = self.Text
+				NewToggle.SubText.Visible = true
+			end
+
+			Tween(NewToggle.Frame,{.1},{
+				BackgroundColor3 = self.Value and Color3.fromRGB(130, 255, 180) or Color3.fromRGB(255, 130, 180),
+			})
+			Tween(NewToggle.Frame.Frame,{.1},{
+				Position = self.Value and UDim2.new(1,-3,0.5,0) or UDim2.new(0,3,0.5,0),
+				AnchorPoint = self.Value and Vector2.new(1,0.5) or Vector2.new(0,0.5)
+			})
+
+			if not Callback then return end
+			Callback(self.Value)
+		end
+
 		Info:Set()
-	end)
-	NewNumber:FindFirstChild("Remove").MouseButton1Click:Connect(function()
-		if math.max(Info.Value - Info.Step,Info.Min) == Info.Value then return end
-		Info.Value = math.max(Info.Value - Info.Step,Info.Min)
-		Info:Set()
-	end)
-	NewNumber.TextBox.FocusLost:Connect(function()
-		if Info.Value == tonumber(NewNumber.TextBox.Text) or not tonumber(NewNumber.TextBox.Text) then
+
+		NewToggle.Parent = Settings.Ui
+		NewToggle.Frame.TextButton.MouseButton1Click:Connect(function()
+			Info.Value = not Info.Value
+			Info:Set()
+		end)
+
+		return Info
+	end
+
+	function Settings:AddNumber(Info,Callback)
+		Info = {
+			Name = Info.Name or "Number",
+			Text = Info.Text,
+			Value = Info.Value or 0,
+			Min = Info.Min or 0,
+			Max = Info.Max or math.huge,
+			Step = Info.Step or 1,
+		}
+
+		local NewNumber = Settings.Ui.UIListLayout.Number:Clone()
+
+		function Info:Set()
+			NewNumber.TextLabel.Text = Info.Name
+			if Info.Text then
+				NewNumber.SubText.Text = Info.Text
+				NewNumber.SubText.Visible = true
+			end
+
 			NewNumber.TextBox.Text = tostring(Info.Value)
-			return
+
+			if Callback then
+				Callback(Info.Value)
+			end
 		end
 
-		Info.Value = math.clamp(tonumber(NewNumber.TextBox.Text),Info.Min,Info.Max)
 		Info:Set()
-	end)
 
-	NewNumber.Parent = Settings.Ui
+		NewNumber.Add.MouseButton1Click:Connect(function()
+			if math.min(Info.Value + Info.Step,Info.Max) == Info.Value then return end
+			Info.Value = math.min(Info.Value + Info.Step,Info.Max)
+			Info:Set()
+		end)
+		NewNumber:FindFirstChild("Remove").MouseButton1Click:Connect(function()
+			if math.max(Info.Value - Info.Step,Info.Min) == Info.Value then return end
+			Info.Value = math.max(Info.Value - Info.Step,Info.Min)
+			Info:Set()
+		end)
+		NewNumber.TextBox.FocusLost:Connect(function()
+			if Info.Value == tonumber(NewNumber.TextBox.Text) or not tonumber(NewNumber.TextBox.Text) then
+				NewNumber.TextBox.Text = tostring(Info.Value)
+				return
+			end
 
-	return Info
+			Info.Value = math.clamp(tonumber(NewNumber.TextBox.Text),Info.Min,Info.Max)
+			Info:Set()
+		end)
+
+		NewNumber.Parent = Settings.Ui
+
+		return Info
+	end
 end
 
 --[[
@@ -1563,670 +1579,669 @@ end
       hl:GetRichLines()                        -- 返回所有行的 RichText 数组
       hl:ApplyTheme(colors)                    -- 更新配色
 ]]
-local Highlighter = {}
-Delta.Highlighter = Highlighter
-
-local typeMap = {
-	[1]  = "String",
-	[2]  = "String",
-	[3]  = "String",
-	[4]  = "Comment",
-	[5]  = "Operator",
-	[6]  = "Number",
-	[7]  = "Keyword",
-	[8]  = "BuiltIn",
-	[9]  = "LocalMethod",
-	[10] = "LocalProperty",
-	[11] = "Nil",
-	[12] = "Bool",
-	[13] = "Function",
-	[14] = "Local",
-	[15] = "Self",
-	[16] = "FunctionName",
-	[17] = "Bracket",
-	[18] = "Executor",
-}
-
-local specialKeywordsTypes = {
-	["nil"]      = 11,
-	["true"]     = 12,
-	["false"]    = 12,
-	["function"] = 13,
-	["local"]    = 14,
-	["self"]     = 15,
-}
-
-local keywords = {
-	["and"] = true, ["break"] = true, ["do"] = true, ["else"] = true,
-	["elseif"] = true, ["end"] = true, ["const"] = true, ["false"] = true,
-	["for"] = true, ["function"] = true, ["if"] = true, ["in"] = true,
-	["local"] = true, ["nil"] = true, ["not"] = true, ["or"] = true,
-	["repeat"] = true, ["return"] = true, ["then"] = true, ["true"] = true,
-	["until"] = true, ["while"] = true, ["plugin"] = true,
-}
-
-local builtIns = {
-	-- 基础函数
-	["delay"] = true, ["elapsedTime"] = true, ["require"] = true, ["spawn"] = true,
-	["tick"] = true, ["time"] = true, ["typeof"] = true, ["UserSettings"] = true,
-	["wait"] = true, ["warn"] = true, ["game"] = true, ["shared"] = true,
-	["script"] = true, ["workspace"] = true, ["assert"] = true, ["collectgarbage"] = true,
-	["error"] = true, ["getfenv"] = true, ["getmetatable"] = true, ["ipairs"] = true,
-	["loadstring"] = true, ["newproxy"] = true, ["next"] = true, ["pairs"] = true,
-	["pcall"] = true, ["print"] = true, ["rawequal"] = true, ["rawget"] = true,
-	["rawset"] = true, ["select"] = true, ["setfenv"] = true, ["setmetatable"] = true,
-	["tonumber"] = true, ["tostring"] = true, ["type"] = true, ["unpack"] = true,
-	["xpcall"] = true, ["_G"] = true, ["_VERSION"] = true,["task"] = true,
-	-- 库
-	["coroutine"] = true, ["debug"] = true, ["math"] = true, ["os"] = true,
-	["string"] = true, ["table"] = true, ["bit32"] = true, ["utf8"] = true,
-	-- Roblox 数据类型
-	["Axes"] = true, ["BrickColor"] = true, ["CFrame"] = true, ["Color3"] = true,
-	["ColorSequence"] = true, ["ColorSequenceKeypoint"] = true, ["DockWidgetPluginGuiInfo"] = true,
-	["Enum"] = true, ["Faces"] = true, ["Instance"] = true, ["NumberRange"] = true,
-	["NumberSequence"] = true, ["NumberSequenceKeypoint"] = true, ["PathWaypoint"] = true,
-	["PhysicalProperties"] = true, ["Random"] = true, ["Ray"] = true, ["Rect"] = true,
-	["Region3"] = true, ["Region3int16"] = true, ["TweenInfo"] = true, ["UDim"] = true,
-	["UDim2"] = true, ["Vector2"] = true, ["Vector2int16"] = true, ["Vector3"] = true,
-	["Vector3int16"] = true,
-}
-
-local executorFuncs = {}
-local executorSubTables = {}
-
-local Executor
-
-if RunService:IsStudio() then
-	Executor = {
-		checkcaller = true,
-		clonefunction = true,
-		getfunctionhash = true,
-		hookfunction = true,
-		hookmetamethod = true,
-		iscclosure = true,
-		isexecutorclosure = true,
-		islclosure = true,
-		loadstring = true,
-		newcclosure = true,
-		restorefunction = true,
-		debug = {
-			getconstant = true,
-			getconstants = true,
-			getproto = true,
-			getprotos = true,
-			getstack = true,
-			getupvalue = true,
-			getupvalues = true,
-			setconstant = true,
-			setstack = true,
-			setupvalue = true,
-		},
-		Drawing = {
-			cleardrawcache = true,
-			getrenderproperty = true,
-			isrenderobj = true,
-			setrenderproperty = true,
-			new = true,
-		},
-		base64decode = true,
-		base64encode = true,
-		lz4compress = true,
-		lz4decompress = true,
-		getgc = true,
-		getgenv = true,
-		getreg = true,
-		getrenv = true,
-		filtergc = true,
-		appendfile = true,
-		delfile = true,
-		delfolder = true,
-		getcustomasset = true,
-		isfile = true,
-		isfolder = true,
-		listfiles = true,
-		loadfile = true,
-		makefolder = true,
-		readfile = true,
-		writefile = true,
-		cloneref = true,
-		compareinstances = true,
-		fireclickdetector = true,
-		fireproximityprompt = true,
-		firetouchinterest = true,
-		getcallbackvalue = true,
-		gethui = true,
-		getinstances = true,
-		getnilinstances = true,
-		getnamecallmethod = true,
-		getrawmetatable = true,
-		isreadonly = true,
-		setrawmetatable = true,
-		setreadonly = true,
-		identifyexecutor = true,
-		request = true,
-		gethiddenproperty = true,
-		gettheadidentity = true,
-		isscriptable = true,
-		sethiddenproperty = true,
-		setscriptable = true,
-		setthreadidentity = true,
-		getcallingscript = true,
-		getloadedmodules = true,
-		getrunningscripts = true,
-		getscriptbytecode = true,
-		getscriptclosure = true,
-		getscriptfromthread = true,
-		getscripthash = true,
-		getsenv = true,
-		getmenv = true,
-		firesignal = true,
-		getconnections = true,
-		replicatesignal = true
+do
+	local Highlighter = {}
+	Delta.Highlighter = Highlighter
+	
+	local typeMap = {
+		[1]  = "String",
+		[2]  = "String",
+		[3]  = "String",
+		[4]  = "Comment",
+		[5]  = "Operator",
+		[6]  = "Number",
+		[7]  = "Keyword",
+		[8]  = "BuiltIn",
+		[9]  = "LocalMethod",
+		[10] = "LocalProperty",
+		[11] = "Nil",
+		[12] = "Bool",
+		[13] = "Function",
+		[14] = "Local",
+		[15] = "Self",
+		[16] = "FunctionName",
+		[17] = "Bracket",
+		[18] = "Executor",
 	}
-else
-	Executor = getgenv()
-end
 
-local builtInInited = false
+	local specialKeywordsTypes = {
+		["nil"]      = 11,
+		["true"]     = 12,
+		["false"]    = 12,
+		["function"] = 13,
+		["local"]    = 14,
+		["self"]     = 15,
+	}
 
-local richReplace = {
-	["'"] = "&apos;",
-	['"'] = "&quot;",
-	["<"] = "&lt;",
-	[">"] = "&gt;",
-	["&"] = "&amp;",
-}
+	local keywords = {
+		["and"] = true, ["break"] = true, ["do"] = true, ["else"] = true,
+		["elseif"] = true, ["end"] = true, ["const"] = true, ["false"] = true,
+		["for"] = true, ["function"] = true, ["if"] = true, ["in"] = true,
+		["local"] = true, ["nil"] = true, ["not"] = true, ["or"] = true,
+		["repeat"] = true, ["return"] = true, ["then"] = true, ["true"] = true,
+		["until"] = true, ["while"] = true, ["plugin"] = true,
+	}
 
-local tabSub = "\205"
-local tabReplacement = (" %s%s "):format(tabSub, tabSub)
+	local builtIns = {
+		-- 基础函数
+		["delay"] = true, ["elapsedTime"] = true, ["require"] = true, ["spawn"] = true,
+		["tick"] = true, ["time"] = true, ["typeof"] = true, ["UserSettings"] = true,
+		["wait"] = true, ["warn"] = true, ["game"] = true, ["shared"] = true,
+		["script"] = true, ["workspace"] = true, ["assert"] = true, ["collectgarbage"] = true,
+		["error"] = true, ["getfenv"] = true, ["getmetatable"] = true, ["ipairs"] = true,
+		["loadstring"] = true, ["newproxy"] = true, ["next"] = true, ["pairs"] = true,
+		["pcall"] = true, ["print"] = true, ["rawequal"] = true, ["rawget"] = true,
+		["rawset"] = true, ["select"] = true, ["setfenv"] = true, ["setmetatable"] = true,
+		["tonumber"] = true, ["tostring"] = true, ["type"] = true, ["unpack"] = true,
+		["xpcall"] = true, ["_G"] = true, ["_VERSION"] = true,["task"] = true,
+		-- 库
+		["coroutine"] = true, ["debug"] = true, ["math"] = true, ["os"] = true,
+		["string"] = true, ["table"] = true, ["bit32"] = true, ["utf8"] = true,
+		-- Roblox 数据类型
+		["Axes"] = true, ["BrickColor"] = true, ["CFrame"] = true, ["Color3"] = true,
+		["ColorSequence"] = true, ["ColorSequenceKeypoint"] = true, ["DockWidgetPluginGuiInfo"] = true,
+		["Enum"] = true, ["Faces"] = true, ["Instance"] = true, ["NumberRange"] = true,
+		["NumberSequence"] = true, ["NumberSequenceKeypoint"] = true, ["PathWaypoint"] = true,
+		["PhysicalProperties"] = true, ["Random"] = true, ["Ray"] = true, ["Rect"] = true,
+		["Region3"] = true, ["Region3int16"] = true, ["TweenInfo"] = true, ["UDim"] = true,
+		["UDim2"] = true, ["Vector2"] = true, ["Vector2int16"] = true, ["Vector3"] = true,
+		["Vector3int16"] = true,
+	}
 
-local tabJumps = {
-	[("[^%s] %s"):format(tabSub, tabSub)] = 0,
-	[(" %s%s"):format(tabSub, tabSub)] = -1,
-	[("%s%s "):format(tabSub, tabSub)] = 2,
-	[("%s [^%s]"):format(tabSub, tabSub)] = 1,
-}
+	local executorFuncs = {}
+	local executorSubTables = {}
 
-local DEFAULT_COLORS = {
-	Text           = Color3.fromRGB(204, 204, 204),
-	Background     = Color3.fromRGB(36, 36, 36),
-	Selection      = Color3.fromRGB(255, 255, 255),
-	SelectionBack  = Color3.fromRGB(11, 90, 175),
-	Operator       = Color3.fromRGB(204, 204, 204),
-	Number         = Color3.fromRGB(255, 198, 0),
-	String         = Color3.fromRGB(173, 241, 149),
-	Comment        = Color3.fromRGB(102, 102, 102),
-	Keyword        = Color3.fromRGB(248, 109, 124),
-	Error          = Color3.fromRGB(255, 0, 0),
-	FindBackground = Color3.fromRGB(141, 118, 0),
-	MatchingWord   = Color3.fromRGB(85, 85, 85),
-	BuiltIn        = Color3.fromRGB(132, 214, 247),
-	CurrentLine    = Color3.fromRGB(45, 50, 65),
-	LocalMethod    = Color3.fromRGB(253, 251, 172),
-	LocalProperty  = Color3.fromRGB(97, 161, 241),
-	Nil            = Color3.fromRGB(255, 198, 0),
-	Bool           = Color3.fromRGB(255, 198, 0),
-	Function       = Color3.fromRGB(248, 109, 124),
-	Local          = Color3.fromRGB(248, 109, 124),
-	Self           = Color3.fromRGB(248, 109, 124),
-	FunctionName   = Color3.fromRGB(253, 251, 172),
-	Bracket        = Color3.fromRGB(204, 204, 204),
-	Executor       = Color3.fromRGB(200, 0, 255),
-}
+	local Executor
 
-local function collectExecutor(exec)
-	if type(exec) ~= "table" then return end
-	for name, value in next, exec do
-		if type(name) ~= "string" then continue end
-		if type(value) == "table" then
-			local sub = executorSubTables[name]
-			if not sub then
-				sub = {}
-				executorSubTables[name] = sub
+	if RunService:IsStudio() then
+		Executor = {
+			checkcaller = true,
+			clonefunction = true,
+			getfunctionhash = true,
+			hookfunction = true,
+			hookmetamethod = true,
+			iscclosure = true,
+			isexecutorclosure = true,
+			islclosure = true,
+			loadstring = true,
+			newcclosure = true,
+			restorefunction = true,
+			debug = {
+				getconstant = true,
+				getconstants = true,
+				getproto = true,
+				getprotos = true,
+				getstack = true,
+				getupvalue = true,
+				getupvalues = true,
+				setconstant = true,
+				setstack = true,
+				setupvalue = true,
+			},
+			Drawing = {
+				cleardrawcache = true,
+				getrenderproperty = true,
+				isrenderobj = true,
+				setrenderproperty = true,
+				new = true,
+			},
+			base64decode = true,
+			base64encode = true,
+			lz4compress = true,
+			lz4decompress = true,
+			getgc = true,
+			getgenv = true,
+			getreg = true,
+			getrenv = true,
+			filtergc = true,
+			appendfile = true,
+			delfile = true,
+			delfolder = true,
+			getcustomasset = true,
+			isfile = true,
+			isfolder = true,
+			listfiles = true,
+			loadfile = true,
+			makefolder = true,
+			readfile = true,
+			writefile = true,
+			cloneref = true,
+			compareinstances = true,
+			fireclickdetector = true,
+			fireproximityprompt = true,
+			firetouchinterest = true,
+			getcallbackvalue = true,
+			gethui = true,
+			getinstances = true,
+			getnilinstances = true,
+			getnamecallmethod = true,
+			getrawmetatable = true,
+			isreadonly = true,
+			setrawmetatable = true,
+			setreadonly = true,
+			identifyexecutor = true,
+			request = true,
+			gethiddenproperty = true,
+			gettheadidentity = true,
+			isscriptable = true,
+			sethiddenproperty = true,
+			setscriptable = true,
+			setthreadidentity = true,
+			getcallingscript = true,
+			getloadedmodules = true,
+			getrunningscripts = true,
+			getscriptbytecode = true,
+			getscriptclosure = true,
+			getscriptfromthread = true,
+			getscripthash = true,
+			getsenv = true,
+			getmenv = true,
+			firesignal = true,
+			getconnections = true,
+			replicatesignal = true
+		}
+	else
+		Executor = getgenv()
+	end
+
+	local builtInInited = false
+
+	local richReplace = {
+		["'"] = "&apos;",
+		['"'] = "&quot;",
+		["<"] = "&lt;",
+		[">"] = "&gt;",
+		["&"] = "&amp;",
+	}
+
+	local tabSub = "\205"
+	local tabReplacement = (" %s%s "):format(tabSub, tabSub)
+
+	local tabJumps = {
+		[("[^%s] %s"):format(tabSub, tabSub)] = 0,
+		[(" %s%s"):format(tabSub, tabSub)] = -1,
+		[("%s%s "):format(tabSub, tabSub)] = 2,
+		[("%s [^%s]"):format(tabSub, tabSub)] = 1,
+	}
+
+	local DEFAULT_COLORS = {
+		Text           = Color3.fromRGB(204, 204, 204),
+		Background     = Color3.fromRGB(36, 36, 36),
+		Selection      = Color3.fromRGB(255, 255, 255),
+		SelectionBack  = Color3.fromRGB(11, 90, 175),
+		Operator       = Color3.fromRGB(204, 204, 204),
+		Number         = Color3.fromRGB(255, 198, 0),
+		String         = Color3.fromRGB(173, 241, 149),
+		Comment        = Color3.fromRGB(102, 102, 102),
+		Keyword        = Color3.fromRGB(248, 109, 124),
+		Error          = Color3.fromRGB(255, 0, 0),
+		FindBackground = Color3.fromRGB(141, 118, 0),
+		MatchingWord   = Color3.fromRGB(85, 85, 85),
+		BuiltIn        = Color3.fromRGB(132, 214, 247),
+		CurrentLine    = Color3.fromRGB(45, 50, 65),
+		LocalMethod    = Color3.fromRGB(253, 251, 172),
+		LocalProperty  = Color3.fromRGB(97, 161, 241),
+		Nil            = Color3.fromRGB(255, 198, 0),
+		Bool           = Color3.fromRGB(255, 198, 0),
+		Function       = Color3.fromRGB(248, 109, 124),
+		Local          = Color3.fromRGB(248, 109, 124),
+		Self           = Color3.fromRGB(248, 109, 124),
+		FunctionName   = Color3.fromRGB(253, 251, 172),
+		Bracket        = Color3.fromRGB(204, 204, 204),
+		Executor       = Color3.fromRGB(200, 0, 255),
+	}
+
+	local function collectExecutor(exec)
+		if type(exec) ~= "table" then return end
+		for name, value in next, exec do
+			if type(name) ~= "string" then continue end
+			if type(value) == "table" then
+				local sub = executorSubTables[name]
+				if not sub then
+					sub = {}
+					executorSubTables[name] = sub
+				end
+				for subName in next, value do
+					if type(subName) == "string" then
+						sub[subName] = true
+					end
+				end
+				executorFuncs[name] = true
+			else
+				executorFuncs[name] = true
 			end
-			for subName in next, value do
-				if type(subName) == "string" then
-					sub[subName] = true
+		end
+	end
+
+	local function initBuiltIn()
+		local env = getfenv and getfenv() or _G
+		for name in next, builtIns do
+			local envVal = env[name]
+			if type(envVal) == "table" then
+				local items = {}
+				for i, v in next, envVal do
+					items[i] = true
+				end
+				builtIns[name] = items
+			end
+		end
+
+		local ok, enums = pcall(function() return Enum:GetEnums() end)
+		if ok and enums then
+			local enumEntries = {}
+			for i = 1, #enums do
+				enumEntries[tostring(enums[i])] = true
+			end
+			builtIns["Enum"] = enumEntries
+		end
+
+		collectExecutor(Executor)
+
+		builtInInited = true
+	end
+
+	local funcs = {}
+	local mt = { __index = funcs }
+
+	function funcs._splitLines(self, text)
+		local lines = {}
+		local count = 1
+		text = text:gsub("\r\n", "\n")
+		for line in text:gmatch("([^\n]*)\n?") do
+			lines[count] = line
+			count = count + 1
+		end
+		if #lines > 1 and lines[#lines] == "" and text:sub(-1) == "\n" then
+			lines[#lines] = nil
+		end
+		return lines
+	end
+
+	function funcs.MakeRichTemplates(self)
+		local floor = math.floor
+		local templates = {}
+		for name, color in pairs(self.Colors) do
+			templates[name] = ('<font color="rgb(%s,%s,%s)">'):format(
+				floor(color.r * 255), floor(color.g * 255), floor(color.b * 255))
+		end
+		self.RichTemplates = templates
+	end
+
+	function funcs.TabAdjust(self, x, y)
+		local line = self.Lines[y + 1]
+		x = x + 1
+		if line then
+			local left   = line:sub(x - 1, x - 1)
+			local middle = line:sub(x, x)
+			local right  = line:sub(x + 1, x + 1)
+			local selRange = (#left > 0 and left or " ")
+				.. (#middle > 0 and middle or " ")
+				.. (#right > 0 and right or " ")
+			for i, v in pairs(tabJumps) do
+				if selRange:find(i) then
+					return v
 				end
 			end
-			executorFuncs[name] = true
-		else
-			executorFuncs[name] = true
 		end
-	end
-end
-
-local function initBuiltIn()
-	local env = getfenv and getfenv() or _G
-	for name in next, builtIns do
-		local envVal = env[name]
-		if type(envVal) == "table" then
-			local items = {}
-			for i, v in next, envVal do
-				items[i] = true
-			end
-			builtIns[name] = items
-		end
+		return 0
 	end
 
-	local ok, enums = pcall(function() return Enum:GetEnums() end)
-	if ok and enums then
-		local enumEntries = {}
-		for i = 1, #enums do
-			enumEntries[tostring(enums[i])] = true
-		end
-		builtIns["Enum"] = enumEntries
-	end
-
-	collectExecutor(Executor)
-
-	builtInInited = true
-end
-
-local funcs = {}
-local mt = { __index = funcs }
-
-function funcs._splitLines(self, text)
-	local lines = {}
-	local count = 1
-	text = text:gsub("\r\n", "\n")
-	for line in text:gmatch("([^\n]*)\n?") do
-		lines[count] = line
-		count = count + 1
-	end
-	if #lines > 1 and lines[#lines] == "" and text:sub(-1) == "\n" then
-		lines[#lines] = nil
-	end
-	return lines
-end
-
-function funcs.MakeRichTemplates(self)
-	local floor = math.floor
-	local templates = {}
-	for name, color in pairs(self.Colors) do
-		templates[name] = ('<font color="rgb(%s,%s,%s)">'):format(
-			floor(color.r * 255), floor(color.g * 255), floor(color.b * 255))
-	end
-	self.RichTemplates = templates
-end
-
-function funcs.TabAdjust(self, x, y)
-	local line = self.Lines[y + 1]
-	x = x + 1
-	if line then
-		local left   = line:sub(x - 1, x - 1)
-		local middle = line:sub(x, x)
-		local right  = line:sub(x + 1, x + 1)
-		local selRange = (#left > 0 and left or " ")
-			.. (#middle > 0 and middle or " ")
-			.. (#right > 0 and right or " ")
-		for i, v in pairs(tabJumps) do
-			if selRange:find(i) then
-				return v
-			end
-		end
-	end
-	return 0
-end
-
-function funcs._mapNewLines(self)
-	local newLines = {}
-	local count = 1
-	local text = self.Text
-	local find = string.find
-	local init = 1
-	local pos = find(text, "\n", init, true)
-	while pos do
-		newLines[count] = pos
-		count = count + 1
-		init = pos + 1
-		pos = find(text, "\n", init, true)
-	end
-	self.NewLines = newLines
-end
-
-function funcs.PreHighlight(self)
-	local text = self.Text:gsub("\\\\", "  ")
-	local textLen = #text
-	local found, foundMap, extras = {}, {}, {}
-	local find = string.find
-	local sub = string.sub
-	self.ColoredLines = {}
-
-	local function findAll(str, pattern, typ, raw)
-		local count = #found + 1
+	function funcs._mapNewLines(self)
+		local newLines = {}
+		local count = 1
+		local text = self.Text
+		local find = string.find
 		local init = 1
-		local x, y, extra = find(str, pattern, init, raw)
-		while x do
-			found[count] = x
-			foundMap[x] = typ
-			if extra then extras[x] = extra end
+		local pos = find(text, "\n", init, true)
+		while pos do
+			newLines[count] = pos
 			count = count + 1
-			init = y + 1
-			x, y, extra = find(str, pattern, init, raw)
+			init = pos + 1
+			pos = find(text, "\n", init, true)
 		end
+		self.NewLines = newLines
 	end
 
-	findAll(text, '"', 1, true)
-	findAll(text, "'", 2, true)
-	findAll(text, "%[(=*)%[", 3)
-	findAll(text, "--", 4, true)
-	table.sort(found)
+	function funcs.PreHighlight(self)
+		local text = self.Text:gsub("\\\\", "  ")
+		local textLen = #text
+		local found, foundMap, extras = {}, {}, {}
+		local find = string.find
+		local sub = string.sub
+		self.ColoredLines = {}
 
-	local newLines = self.NewLines
-	local curLine = 0
-	local lineEnd = 0
-	local lastEnding = 0
-	local foundHighlights = {}
-
-	for i = 1, #found do
-		local pos = found[i]
-		if pos <= lastEnding then continue end
-
-		local ending = pos
-		local typ = foundMap[pos]
-
-		if typ == 1 then
-			ending = find(text, '"', pos + 1, true)
-			while ending and sub(text, ending - 1, ending - 1) == "\\" do
-				ending = find(text, '"', ending + 1, true)
+		local function findAll(str, pattern, typ, raw)
+			local count = #found + 1
+			local init = 1
+			local x, y, extra = find(str, pattern, init, raw)
+			while x do
+				found[count] = x
+				foundMap[x] = typ
+				if extra then extras[x] = extra end
+				count = count + 1
+				init = y + 1
+				x, y, extra = find(str, pattern, init, raw)
 			end
-			if not ending then ending = textLen end
-		elseif typ == 2 then
-			ending = find(text, "'", pos + 1, true)
-			while ending and sub(text, ending - 1, ending - 1) == "\\" do
-				ending = find(text, "'", ending + 1, true)
-			end
-			if not ending then ending = textLen end
-		elseif typ == 3 then
-			_, ending = find(text, "]" .. extras[pos] .. "]", pos + 1, true)
-			if not ending then ending = textLen end
-		elseif typ == 4 then
-			local ahead = foundMap[pos + 2]
-			if ahead == 3 then
-				_, ending = find(text, "]" .. extras[pos + 2] .. "]", pos + 1, true)
+		end
+
+		findAll(text, '"', 1, true)
+		findAll(text, "'", 2, true)
+		findAll(text, "%[(=*)%[", 3)
+		findAll(text, "--", 4, true)
+		table.sort(found)
+
+		local newLines = self.NewLines
+		local curLine = 0
+		local lineEnd = 0
+		local lastEnding = 0
+		local foundHighlights = {}
+
+		for i = 1, #found do
+			local pos = found[i]
+			if pos <= lastEnding then continue end
+
+			local ending = pos
+			local typ = foundMap[pos]
+
+			if typ == 1 then
+				ending = find(text, '"', pos + 1, true)
+				while ending and sub(text, ending - 1, ending - 1) == "\\" do
+					ending = find(text, '"', ending + 1, true)
+				end
 				if not ending then ending = textLen end
-			else
-				ending = find(text, "\n", pos + 1, true) or textLen
+			elseif typ == 2 then
+				ending = find(text, "'", pos + 1, true)
+				while ending and sub(text, ending - 1, ending - 1) == "\\" do
+					ending = find(text, "'", ending + 1, true)
+				end
+				if not ending then ending = textLen end
+			elseif typ == 3 then
+				_, ending = find(text, "]" .. extras[pos] .. "]", pos + 1, true)
+				if not ending then ending = textLen end
+			elseif typ == 4 then
+				local ahead = foundMap[pos + 2]
+				if ahead == 3 then
+					_, ending = find(text, "]" .. extras[pos + 2] .. "]", pos + 1, true)
+					if not ending then ending = textLen end
+				else
+					ending = find(text, "\n", pos + 1, true) or textLen
+				end
 			end
-		end
 
-		while pos > lineEnd do
-			curLine = curLine + 1
-			lineEnd = newLines[curLine] or textLen + 1
-		end
-
-		while true do
-			local lineTable = foundHighlights[curLine]
-			if not lineTable then lineTable = {} foundHighlights[curLine] = lineTable end
-			lineTable[pos] = {typ, ending}
-
-			if ending > lineEnd then
+			while pos > lineEnd do
 				curLine = curLine + 1
 				lineEnd = newLines[curLine] or textLen + 1
+			end
+
+			while true do
+				local lineTable = foundHighlights[curLine]
+				if not lineTable then lineTable = {} foundHighlights[curLine] = lineTable end
+				lineTable[pos] = {typ, ending}
+
+				if ending > lineEnd then
+					curLine = curLine + 1
+					lineEnd = newLines[curLine] or textLen + 1
+				else
+					break
+				end
+			end
+
+			lastEnding = ending
+		end
+
+		self.PreHighlights = foundHighlights
+	end
+
+	function funcs.HighlightLine(self, line)
+		local cached = self.ColoredLines[line]
+		if cached then return cached end
+
+		local sub   = string.sub
+		local find  = string.find
+		local match = string.match
+		local highlights = {}
+		local preHighlights = self.PreHighlights[line] or {}
+		local lineText = self.Lines[line] or ""
+		local lastEnding = 0
+		local currentType = 0
+		local lastWord = nil
+		local wordBeginsDotted = false
+		local funcStatus = 0
+		local lineStart = self.NewLines[line - 1] or 0
+
+		local preHighlightMap = {}
+		for pos, data in next, preHighlights do
+			local relativePos = pos - lineStart
+			if relativePos < 1 then
+				currentType = data[1]
+				lastEnding = data[2] - lineStart
 			else
-				break
+				preHighlightMap[relativePos] = {data[1], data[2] - lineStart}
 			end
 		end
 
-		lastEnding = ending
-	end
+		for col = 1, #lineText do
+			if col <= lastEnding then
+				highlights[col] = currentType
+				continue
+			end
 
-	self.PreHighlights = foundHighlights
-end
-
-function funcs.HighlightLine(self, line)
-	local cached = self.ColoredLines[line]
-	if cached then return cached end
-
-	local sub   = string.sub
-	local find  = string.find
-	local match = string.match
-	local highlights = {}
-	local preHighlights = self.PreHighlights[line] or {}
-	local lineText = self.Lines[line] or ""
-	local lastEnding = 0
-	local currentType = 0
-	local lastWord = nil
-	local wordBeginsDotted = false
-	local funcStatus = 0
-	local lineStart = self.NewLines[line - 1] or 0
-
-	local preHighlightMap = {}
-	for pos, data in next, preHighlights do
-		local relativePos = pos - lineStart
-		if relativePos < 1 then
-			currentType = data[1]
-			lastEnding = data[2] - lineStart
-		else
-			preHighlightMap[relativePos] = {data[1], data[2] - lineStart}
-		end
-	end
-
-	for col = 1, #lineText do
-		if col <= lastEnding then
-			highlights[col] = currentType
-			continue
-		end
-
-		local pre = preHighlightMap[col]
-		if pre then
-			currentType = pre[1]
-			lastEnding = pre[2]
-			highlights[col] = currentType
-			wordBeginsDotted = false
-			lastWord = nil
-			funcStatus = 0
-		else
-			local char = sub(lineText, col, col)
-			if find(char, "[%a_]") then
-				local word = match(lineText, "[%a%d_]+", col)
-				local isExecutor = executorFuncs[word] and true or false
-				local wordType = (keywords[word] and 7)
-					or (isExecutor and 18)
-					or (builtIns[word] and 8)
-
-				lastEnding = col + #word - 1
-
-				if wordType ~= 7 then
-					if wordBeginsDotted then
-						local prevWord = lastWord
-						local prevBuiltIn = prevWord and builtIns[prevWord]
-						local prevSub = prevWord and executorSubTables[prevWord]
-
-						if isExecutor and (prevWord == "Executor" or executorFuncs[prevWord]) then
-							wordType = 18
-						elseif prevSub and prevSub[word] then
-							wordType = 18
-						else
-							wordType = (prevBuiltIn and type(prevBuiltIn) == "table"
-								and prevBuiltIn[word] and 8) or 10
-						end
-					end
-
-					if wordType ~= 8 and wordType ~= 18 then
-						local x, y, br = find(lineText, "^%s*([%({\"'])", lastEnding + 1)
-						if x then
-							wordType = (funcStatus > 0 and br == "(" and 16) or 9
-							funcStatus = 0
-						end
-					end
-				else
-					wordType = specialKeywordsTypes[word] or wordType
-					funcStatus = (word == "function" and 1 or 0)
-				end
-
-				lastWord = word
-				wordBeginsDotted = false
-				if funcStatus > 0 then funcStatus = 1 end
-
-				if wordType then
-					currentType = wordType
-					highlights[col] = currentType
-				else
-					currentType = nil
-				end
-			elseif find(char, "%p") then
-				local isDot = (char == ".")
-				local isNum = isDot and find(sub(lineText, col + 1, col + 1), "%d")
-				highlights[col] = (isNum and 6 or 5)
-
-				if not isNum then
-					local dotStr = isDot and match(lineText, "%.%.?%.?", col)
-					if dotStr and #dotStr > 1 then
-						currentType = 5
-						lastEnding = col + #dotStr - 1
-						wordBeginsDotted = false
-						lastWord = nil
-						funcStatus = 0
-					else
-						if isDot then
-							if wordBeginsDotted then
-								lastWord = nil
-							else
-								wordBeginsDotted = true
-							end
-						else
-							wordBeginsDotted = false
-							lastWord = nil
-						end
-						funcStatus = ((isDot or char == ":") and funcStatus == 1 and 2) or 0
-					end
-				end
-			elseif find(char, "%d") then
-				local _, endPos = find(lineText, "%x+", col)
-				local endPart = sub(lineText, endPos, endPos + 1)
-				if (endPart == "e+" or endPart == "e-")
-					and find(sub(lineText, endPos + 2, endPos + 2), "%d") then
-					endPos = endPos + 1
-				end
-				currentType = 6
-				lastEnding = endPos
-				highlights[col] = 6
+			local pre = preHighlightMap[col]
+			if pre then
+				currentType = pre[1]
+				lastEnding = pre[2]
+				highlights[col] = currentType
 				wordBeginsDotted = false
 				lastWord = nil
 				funcStatus = 0
 			else
-				highlights[col] = currentType
-				local _, endPos = find(lineText, "%s+", col)
-				if endPos then lastEnding = endPos end
+				local char = sub(lineText, col, col)
+				if find(char, "[%a_]") then
+					local word = match(lineText, "[%a%d_]+", col)
+					local isExecutor = executorFuncs[word] and true or false
+					local wordType = (keywords[word] and 7)
+						or (isExecutor and 18)
+						or (builtIns[word] and 8)
+
+					lastEnding = col + #word - 1
+
+					if wordType ~= 7 then
+						if wordBeginsDotted then
+							local prevWord = lastWord
+							local prevBuiltIn = prevWord and builtIns[prevWord]
+							local prevSub = prevWord and executorSubTables[prevWord]
+
+							if isExecutor and (prevWord == "Executor" or executorFuncs[prevWord]) then
+								wordType = 18
+							elseif prevSub and prevSub[word] then
+								wordType = 18
+							else
+								wordType = (prevBuiltIn and type(prevBuiltIn) == "table"
+									and prevBuiltIn[word] and 8) or 10
+							end
+						end
+
+						if wordType ~= 8 and wordType ~= 18 then
+							local x, y, br = find(lineText, "^%s*([%({\"'])", lastEnding + 1)
+							if x then
+								wordType = (funcStatus > 0 and br == "(" and 16) or 9
+								funcStatus = 0
+							end
+						end
+					else
+						wordType = specialKeywordsTypes[word] or wordType
+						funcStatus = (word == "function" and 1 or 0)
+					end
+
+					lastWord = word
+					wordBeginsDotted = false
+					if funcStatus > 0 then funcStatus = 1 end
+
+					if wordType then
+						currentType = wordType
+						highlights[col] = currentType
+					else
+						currentType = nil
+					end
+				elseif find(char, "%p") then
+					local isDot = (char == ".")
+					local isNum = isDot and find(sub(lineText, col + 1, col + 1), "%d")
+					highlights[col] = (isNum and 6 or 5)
+
+					if not isNum then
+						local dotStr = isDot and match(lineText, "%.%.?%.?", col)
+						if dotStr and #dotStr > 1 then
+							currentType = 5
+							lastEnding = col + #dotStr - 1
+							wordBeginsDotted = false
+							lastWord = nil
+							funcStatus = 0
+						else
+							if isDot then
+								if wordBeginsDotted then
+									lastWord = nil
+								else
+									wordBeginsDotted = true
+								end
+							else
+								wordBeginsDotted = false
+								lastWord = nil
+							end
+							funcStatus = ((isDot or char == ":") and funcStatus == 1 and 2) or 0
+						end
+					end
+				elseif find(char, "%d") then
+					local _, endPos = find(lineText, "%x+", col)
+					local endPart = sub(lineText, endPos, endPos + 1)
+					if (endPart == "e+" or endPart == "e-")
+						and find(sub(lineText, endPos + 2, endPos + 2), "%d") then
+						endPos = endPos + 1
+					end
+					currentType = 6
+					lastEnding = endPos
+					highlights[col] = 6
+					wordBeginsDotted = false
+					lastWord = nil
+					funcStatus = 0
+				else
+					highlights[col] = currentType
+					local _, endPos = find(lineText, "%s+", col)
+					if endPos then lastEnding = endPos end
+				end
 			end
 		end
+
+		self.ColoredLines[line] = highlights
+		return highlights
 	end
 
-	self.ColoredLines[line] = highlights
-	return highlights
-end
+	function funcs.GetRichLine(self, lineIndex)
+		local lineText = self.Lines[lineIndex] or ""
+		if #lineText == 0 then return "" end
 
-function funcs.GetRichLine(self, lineIndex)
-	local lineText = self.Lines[lineIndex] or ""
-	if #lineText == 0 then return "" end
+		local highlights = self:HighlightLine(lineIndex)
+		local gsub = string.gsub
+		local sub  = string.sub
+		local richTemplates = self.RichTemplates
+		local textTemplate = richTemplates.Text
 
-	local highlights = self:HighlightLine(lineIndex)
-	local gsub = string.gsub
-	local sub  = string.sub
-	local richTemplates = self.RichTemplates
-	local textTemplate = richTemplates.Text
+		local resText = ""
+		local colStart = 1
+		local curType = highlights[1]
+		local curTemplate = richTemplates[typeMap[curType]] or textTemplate
 
-	local resText = ""
-	local colStart = 1
-	local curType = highlights[1]
-	local curTemplate = richTemplates[typeMap[curType]] or textTemplate
-
-	for col = 2, #lineText do
-		local posType = highlights[col]
-		if posType ~= curType then
-			local template = richTemplates[typeMap[posType]] or textTemplate
-			if template ~= curTemplate then
-				local nextText = gsub(sub(lineText, colStart, col - 1), "['\"<>&]", richReplace)
-				resText = resText .. (curTemplate ~= textTemplate and (curTemplate .. nextText .. "</font>") or nextText)
-				colStart = col
-				curTemplate = template
+		for col = 2, #lineText do
+			local posType = highlights[col]
+			if posType ~= curType then
+				local template = richTemplates[typeMap[posType]] or textTemplate
+				if template ~= curTemplate then
+					local nextText = gsub(sub(lineText, colStart, col - 1), "['\"<>&]", richReplace)
+					resText = resText .. (curTemplate ~= textTemplate and (curTemplate .. nextText .. "</font>") or nextText)
+					colStart = col
+					curTemplate = template
+				end
+				curType = posType
 			end
-			curType = posType
 		end
+
+		local lastText = gsub(sub(lineText, colStart, #lineText), "['\"<>&]", richReplace)
+		if #lastText > 0 then
+			resText = resText
+				.. (curTemplate ~= textTemplate and (curTemplate .. lastText .. "</font>") or lastText)
+		end
+
+		return resText
 	end
 
-	local lastText = gsub(sub(lineText, colStart, #lineText), "['\"<>&]", richReplace)
-	if #lastText > 0 then
-		resText = resText
-			.. (curTemplate ~= textTemplate and (curTemplate .. lastText .. "</font>") or lastText)
+	function funcs.GetRichLines(self)
+		local out = {}
+		for i = 1, #self.Lines do
+			out[i] = self:GetRichLine(i)
+		end
+		return out
 	end
 
-	return resText
-end
-
-function funcs.GetRichLines(self)
-	local out = {}
-	for i = 1, #self.Lines do
-		out[i] = self:GetRichLine(i)
+	function funcs.SetText(self, txt)
+		txt = txt:gsub("\r\n", "\n")
+		self.Text = txt
+		self.Lines = self:_splitLines(txt)
+		if #self.Lines == 0 then self.Lines = {""} end
+		self:_mapNewLines()
+		self:PreHighlight()
 	end
-	return out
-end
 
-function funcs.SetText(self, txt)
-	txt = txt:gsub("\r\n", "\n")
-	self.Text = txt
-	self.Lines = self:_splitLines(txt)
-	if #self.Lines == 0 then self.Lines = {""} end
-	self:_mapNewLines()
-	self:PreHighlight()
-end
+	function funcs.GetText(self)
+		return table.concat(self.Lines, "\n")
+	end
 
-function funcs.GetText(self)
-	return table.concat(self.Lines, "\n")
-end
+	function funcs.ApplyTheme(self, colors)
+		if colors then
+			for k, v in pairs(colors) do
+				self.Colors[k] = v
+			end
+		end
+		self:MakeRichTemplates()
+	end
 
-function funcs.ApplyTheme(self, colors)
-	if colors then
-		for k, v in pairs(colors) do
+	function funcs.Refresh(self)
+		self.ColoredLines = {}
+		self:_mapNewLines()
+		self:PreHighlight()
+	end
+
+	function Highlighter.new(opts)
+		opts = opts or {}
+		if not builtInInited then initBuiltIn() end
+
+		local self = setmetatable({}, mt)
+		self.Colors = {}
+		for k, v in pairs(DEFAULT_COLORS) do
 			self.Colors[k] = v
 		end
-	end
-	self:MakeRichTemplates()
-end
-
-function funcs.Refresh(self)
-	self.ColoredLines = {}
-	self:_mapNewLines()
-	self:PreHighlight()
-end
-
-function Highlighter.new(opts)
-	opts = opts or {}
-	if not builtInInited then initBuiltIn() end
-
-	local self = setmetatable({}, mt)
-	self.Colors = {}
-	for k, v in pairs(DEFAULT_COLORS) do
-		self.Colors[k] = v
-	end
-	if opts.Colors then
-		for k, v in pairs(opts.Colors) do
-			self.Colors[k] = v
+		if opts.Colors then
+			for k, v in pairs(opts.Colors) do
+				self.Colors[k] = v
+			end
 		end
+
+		self.Lines = {""}
+		self.Text = ""
+		self.NewLines = {}
+		self.ColoredLines = {}
+		self.PreHighlights = {}
+		self.RichTemplates = {}
+
+		self:MakeRichTemplates()
+		return self
 	end
 
-	self.Lines = {""}
-	self.Text = ""
-	self.NewLines = {}
-	self.ColoredLines = {}
-	self.PreHighlights = {}
-	self.RichTemplates = {}
-
-	self:MakeRichTemplates()
-	return self
+	Highlighter.typeMap = typeMap
+	Highlighter.keywords = keywords
+	Highlighter.builtIns = builtIns
+	Highlighter.executorFuncs = executorFuncs
+	Highlighter.executorSubTables = executorSubTables
+	Highlighter.DEFAULT_COLORS = DEFAULT_COLORS
 end
-
-Highlighter.typeMap = typeMap
-Highlighter.keywords = keywords
-Highlighter.builtIns = builtIns
-Highlighter.executorFuncs = executorFuncs
-Highlighter.executorSubTables = executorSubTables
-Highlighter.DEFAULT_COLORS = DEFAULT_COLORS
-
-
-
 
 -----------------------------------------------------------
 --  杂项
@@ -2838,17 +2853,17 @@ do
 	local KeyManager = {
 		XClientVersion = "8.2.3"
 	}
-	
+
 	local KeyUi = MiscUi.Frame.Key
-	
+
 	Delta.Misc["密钥管理"] = KeyManager
-	
+
 	local function extractTicket(url)
 		if type(url) ~= "string" then return nil end
 		local ticket = url:match("[?&]d=([^&]+)") or url:match("[?&]ticket=([^&]+)")
 		return ticket
 	end
-	
+
 	function KeyManager.CreateLink(HWID,Platform)
 		local FinalHwid = Delta.SHA256(HWID)
 		local result = request({
@@ -2867,11 +2882,11 @@ do
 		if result and result.Success and result.StatusCode == 200 then
 			local data = HttpService:JSONDecode(result.Body)
 			local url = data and data.data and data.data.url
-			
+
 			return url
 		end
 	end
-	
+
 	function KeyManager.GetStatus(Link)
 		local api = `https://auth.platorelay.com/api/session/status?ticket={extractTicket(Link)}`
 		local Status = request({
@@ -2883,7 +2898,7 @@ do
 				["X-Client-Version"] = KeyManager.XClientVersion,
 			},
 		})
-		
+
 		local body
 		if type(Status) == "table" then
 			body = Status.Body or Status.body
@@ -2896,7 +2911,7 @@ do
 			return data.data --data.data.key, data.data.minutesLeft
 		end
 	end
-	
+
 	local function formatMinutes(mins)
 		if type(mins) ~= "number" then return "未知" end
 		if mins <= 0 then return "已过期" end
@@ -2917,7 +2932,7 @@ do
 			return string.format("%d 秒", seconds)
 		end
 	end
-	
+
 	function KeyManager.Init()
 		KeyUi.Background.MainScroll.HWID.Input.Text = gethwid()
 		local hwid = KeyUi.Background.MainScroll.HWID.Input.Text
@@ -2963,18 +2978,18 @@ do
 				timeLabel.Text = formatRemaining(remaining)
 				timeLabel.TextColor3 = Color3.fromRGB(74, 222, 128)
 			end
-			
+
 			KeyUi.Background.MainScroll.LeftTime.Frame.Frame.Key.Text = Status.key or "无"
 		end
 
 		update()
-		
+
 		KeyUi.Background.MainScroll.LeftTime.Frame.Refresh.MouseButton1Click:Connect(function()
 			hwid = KeyUi.Background.MainScroll.HWID.Input.Text
 			CurrentLink = KeyManager.CreateLink(hwid, CurrentPlatform)
 			Status = KeyManager.GetStatus(CurrentLink)
 		end)
-		
+
 		local function TogglePlatform(Target)
 			for i,v in KeyUi.Background.MainScroll.Main.Platform.Frame:GetChildren() do
 				if v:IsA("TextButton") then
@@ -2987,9 +3002,9 @@ do
 				end
 			end
 		end
-		
+
 		TogglePlatform(CurrentPlatform)
-		
+
 		for i,v in KeyUi.Background.MainScroll.Main.Platform.Frame:GetChildren() do
 			if v:IsA("TextButton") then
 				v.MouseButton1Click:Connect(function()
@@ -3029,9 +3044,9 @@ do
 			request = "request(unpack(args))",
 		},
 	}
-	
+
 	Delta.Misc["Rspy"] = Rspy
-	
+
 	if not RunService:IsStudio() then
 		if not isfile("LazyFix") then
 			writefile("LazyFix",game:HttpGet("https://raw.githubusercontent.com/qian-cheng-awa/Tools/refs/heads/main/TableToLua.lua"))
@@ -3040,7 +3055,7 @@ do
 		getgenv().LazyFix = LazyFix
 	end
 
-	
+
 	function Rspy.TableToString(table)
 		return LazyFix.Convert(table, true)
 	end
@@ -3162,37 +3177,40 @@ do
 		end
 		return Path
 	end
-	
+
 	function Rspy.GenCode()
 		RspyUI.Main.Stack.Visible = false
 		RspyUI.Main.Code.Visible = true
-		
+
 		local CurrentInfo = Rspy.CurrentInfo
-		
+		if not CurrentInfo then return end
+
 		local str = `local args = {Rspy.TableToString(CurrentInfo.Args)}`
 		str = str .. "\n\n"
 		str = str .. string.format(Rspy.Methods[CurrentInfo.Method], Rspy.GetPath(CurrentInfo.Remote) or "")
-		
+
 		Rspy.CodeBox:setRaw(str)
 	end
-	
+
 	function Rspy.ReturnValue()
 		RspyUI.Main.Stack.Visible = false
 		RspyUI.Main.Code.Visible = true
-		
+
 		local CurrentInfo = Rspy.CurrentInfo
+		if not CurrentInfo then return end
 
 		local str = `local ReturnValue = {Rspy.TableToString(CurrentInfo.ReturnValue)}`
 
 		Rspy.CodeBox:setRaw(str)
 	end
-	
+
 	function Rspy.CallStack()
 		RspyUI.Main.Stack.Visible = true
 		RspyUI.Main.Code.Visible = false
-		
+
 		local CurrentInfo = Rspy.CurrentInfo
-		
+		if not CurrentInfo then return end
+
 		for i,v in RspyUI.Main.Stack:GetChildren() do
 			if v:IsA("TextButton") then
 				v:Destroy()
@@ -3204,27 +3222,27 @@ do
 			name = (name and name ~= "") and name or "匿名函数"
 			local NewButton = RspyUI.Main.Stack.UIListLayout.TextButton:Clone()
 			NewButton.FunctionName.Text = name
-			
+
 			local scr
-			
+
 			if getfenv(f) and typeof(rawget(getfenv(f),"script")) == "Instance" then
 				scr = Rspy.GetPath(cloneref(rawget(getfenv(f),"script")))
 			else
 				scr = (debug.info(f, "s") or "nil")
 			end
 			NewButton.CallingScript.Text = scr .. ":" .. (debug.info(f, "l") or -1)
-			
+
 			NewButton.Parent = RspyUI.Main.Stack
-			
+
 			NewButton.MouseButton1Click:Connect(function()
 				RspyUI.Main.Stack.Visible = false
 				RspyUI.Main.Code.Visible = true
-				
+
 				Rspy.CodeBox:setRaw(Rspy.TableToString(f))
 			end)
 		end
 	end
-	
+
 	local MethodNormal = {
 		fireserver = "FireServer",
 		invokeserver = "InvokeServer",
@@ -3232,15 +3250,15 @@ do
 		onclientevent = "OnClientEvent",
 		httpget = "HttpGet",
 	}
-	
+
 	local CallbackOwners = setmetatable({}, { __mode = "k" })
 	local ConnectCache = setmetatable({}, { __mode = "k" })
 	local LogCache = setmetatable({}, { __mode = "k" })
-	
+
 	local LogCounter = 0
-	
+
 	local Clone = game.Clone
-	
+
 	function Rspy.Log(Remote,Method,args,returnvalue)
 		local CallStack = {}
 
@@ -3249,7 +3267,7 @@ do
 			if not f then break end
 			table.insert(CallStack, f)
 		end
-		
+
 		task.spawn(function()
 			pcall(setthreadidentity, 8)
 			local targetcache
@@ -3320,8 +3338,8 @@ do
 			end)
 		end)
 	end
-	
-	
+
+
 	local function ResolveCallable(Value)
 		if typeof(Value) == "function" then
 			return Value
@@ -3333,7 +3351,7 @@ do
 		local hasCall, call = pcall(rawget, mt, "__call")
 		return (hasCall and typeof(call) == "function") and call or nil
 	end
-	
+
 	local function CreateDetour(Instance, Method, Callback)
 		local Original = assert(ResolveCallable(Callback), "callback not callable")
 		local IsDirect = rawequal(Callback, Original)
@@ -3354,7 +3372,7 @@ do
 
 			setthreadidentity(2)
 			setfenv(0, getfenv(Original))
-			
+
 			local success, results = pcall(function()
 				if IsDirect then
 					return {Original(table.unpack(args))}
@@ -3369,10 +3387,10 @@ do
 				pcall(Rspy.Log, Instance, "onclientinvoke", args, nil)
 				error(results, 0)
 			end
-			
+
 			setfenv(0, InitEnv)
 			setthreadidentity(InitIdentity)
-			
+
 			pcall(Rspy.Log, Instance, "onclientinvoke", args, results)
 			return unpack(results)
 		end
@@ -3401,14 +3419,14 @@ do
 
 		return CreateDetour(Instance, Method, Value)
 	end
-	
+
 	function Rspy.Init()
 		local othhook = oth.hook
-		
+
 		local InstanceRaw = getrawmetatable(game)
 		local tr = Instance.new("RemoteEvent")
 		local SignalRaw = getrawmetatable(tr.OnClientEvent)
-		
+
 		RspyUI.Main.Buttons.Code.MouseButton1Click:Connect(function()
 			Rspy.GenCode()
 		end)
@@ -3421,9 +3439,39 @@ do
 		RspyUI.Main.Buttons.Copy.MouseButton1Click:Connect(function()
 			setclipboard(Rspy.CodeBox:getRaw())
 		end)
+		RspyUI.List.Frame.TextBox:GetPropertyChangedSignal("Text"):Connect(function()
+			local Keyword = RspyUI.List.Frame.TextBox.Text
+			for i,v in RspyUI.List.ScrollingFrame:GetChildren() do
+				if v:IsA("Frame") then
+					v.Visible = v.RemoteName.Text:lower():find(Keyword)
+				end
+			end
+		end)
+		RspyUI.Top.Clear.MouseButton1Click:Connect(function()
+			LogCache = {}
+			for i,v in RspyUI.List.ScrollingFrame:GetChildren() do
+				if v:IsA("Frame") then
+					v:Destroy()
+				end
+			end
+			Rspy.CurrentInfo = nil
+
+			RspyUI.Main.Method.Text = `无`
+			RspyUI.Main.Path.Text = `选择一个事件`
+			
+			for i,v in RspyUI.Main.Stack:GetChildren() do
+				if v:IsA("TextButton") then
+					v:Destroy()
+				end
+			end
+			
+			Rspy.CodeBox:setRaw("")
+		end)
 		
+		
+
 		local IsA = game.IsA
-		
+
 		local NameCall;NameCall = hookmetamethod(game,"__namecall",newcclosure(function(...)
 			local method = string.lower(getnamecallmethod() or "")
 
@@ -3471,8 +3519,8 @@ do
 
 			return NameCall(...)
 		end))
-		
-		local NewIndex;NewIndex = othhook(rawget(InstanceRaw,"__newindex"), function(...)
+
+		local NewIndex;NewIndex = hookmetamethod(game,"__newindex", newcclosure(function(...)
 			local self, key, value = ...
 
 			if typeof(self) == "Instance" and self.ClassName == "RemoteFunction" then
@@ -3483,28 +3531,28 @@ do
 			end
 
 			return NewIndex(...)
-		end)
-		
+		end))
+
 		local HttpGetH;HttpGetH = othhook(game.HttpGet, function(self, ...)
 			local args = {...}
-			
+
 			local ReturnValue = HttpGetH(self, ...)
-			
+
 			pcall(Rspy.Log, self, "httpget", args, ReturnValue)
-			
+
 			return ReturnValue
 		end)
-		
+
 		local requestH;requestH = othhook(request, function(...)
 			local args = {...}
-			
+
 			local ReturnValue = requestH(...)
-			
+
 			pcall(Rspy.Log, nil, "request", args, ReturnValue)
-			
+
 			return ReturnValue
 		end)
-		
+
 		local function RegisterSignal(Instance)
 			local Signal = Instance["OnClientEvent"]
 			if Signal and not ConnectCache[Signal] then
@@ -3541,7 +3589,7 @@ do
 				end)
 			end
 		end
-		
+
 		for _, obj in ipairs(game:GetDescendants()) do
 			if obj:IsA("RemoteFunction") then
 				HookRF(obj)
@@ -3549,7 +3597,7 @@ do
 				pcall(RegisterSignal, obj)
 			end
 		end
-		
+
 		game.DescendantAdded:Connect(function(obj)
 			if obj:IsA("RemoteFunction") then
 				task.defer(HookRF, obj)
@@ -3557,6 +3605,45 @@ do
 				pcall(RegisterSignal, obj)
 			end
 		end)
+	end
+end
+
+--Dex
+do
+	local Dex = {}
+	Delta.Misc["Dex"] = Dex
+	
+	local DexUi = MiscUi.Frame.Dex
+	
+	function Dex.AddObject(Obj,Config)
+		
+	end
+	
+	function Dex.RemoveObject(Obj)
+		
+	end
+	
+	function Dex.UpdateObject(Obj,Config)
+		
+	end
+	
+	function Dex.Start()
+		Dex.AddObject(game,{
+			Root = true,
+			Display = "game",
+		})
+		
+		Dex.AddObject(Player,{
+			Root = true,
+			Display = `LocalPlayer({Player.Name})`,
+		})
+		
+		if gethui then
+			Dex.AddObject(gethui(),{
+				Root = true,
+				Display = `HiddenGui`,
+			})
+		end
 	end
 end
 
@@ -3580,7 +3667,7 @@ do
 	}
 
 	Delta.Misc["网易云"] = WYY
-	
+
 	local WYYUI = MiscUi.Frame.WYY
 
 	local function GetLoved()
@@ -3588,14 +3675,14 @@ do
 			makefolder("music163/Loved")
 		end
 		local loved = listfiles("music163/Loved")
-		
+
 		for i, v in ipairs(loved) do
 			loved[i] = string.sub(v,#("music163/Loved/")+1)
 		end
-		
+
 		return loved
 	end
-	
+
 	local function IsLoved(Id)
 		local Id = tostring(Id)
 		local Cached = GetLoved()
@@ -3618,6 +3705,11 @@ do
 
 		if typeof(ImageId) == "string" then
 			local id = tonumber(ImageId:match("id=(%d+)"))
+			
+			if isfile(`music163/Cached/{id}_thumb.jpg`) then
+				return getcustomasset(`music163/Cached/{id}_thumb.jpg`)
+			end
+			
 			writefile(`music163/Cached/{id}_thumb.jpg`,game:HttpGet(ImageId))
 
 			return getcustomasset(`music163/Cached/{id}_thumb.jpg`)
@@ -3744,7 +3836,7 @@ do
 		if Page ~= "列表" then
 			WYY.CurrentPage = Page
 		end
-	
+
 		for i,v in WYYUI.List.Buttons:GetChildren() do
 			if v:IsA("TextButton") then
 				Tween(v,{.1},{
@@ -3753,12 +3845,12 @@ do
 				})
 			end
 		end
-		
+
 		for i,v in WYYUI.Pages:GetChildren() do
 			v.Visible = v.Name == Page
 		end
 	end
-	
+
 	function WYY.Play(ID)
 		ID = tostring(ID)
 		local SongInfo = WYY.GetSongInfo(ID)
@@ -3766,22 +3858,22 @@ do
 			if not table.find(WYY.SongList,ID) then
 				table.insert(WYY.SongList,ID)
 			end
-			
+
 			WYY.PlayingSong = SongInfo
-			
+
 			WYYUI.Frame.SongName.Text = SongInfo.Name
 			WYYUI.Frame.Author.Text = SongInfo.Author
 			WYYUI.Frame.Image.Frame.ImageLabel.Image = SongInfo.ImageId
 			WYYUI.Frame.Image.Frame.ImageLabel.Rotation = 0
 			WYYUI.Frame.Love.Text = IsLoved(ID) and "❤" or "♡"
-			
+
 			WYYUI.Sound.SoundId = SongInfo.SoundId
 			WYYUI.Sound.TimePosition = 0
-			
+
 			WYYUI.Sound:Play()
 		end
 	end
-	
+
 	function WYY.NewSongButton(Info)
 		local NewSongButton = WYYUI.Song:Clone()
 		NewSongButton.SongName.Text = Info.Name
@@ -3792,30 +3884,30 @@ do
 		NewSongButton.MouseButton1Click:Connect(function()
 			WYY.Play(Info.Id)
 		end)
-		
+
 		return NewSongButton
 	end
-	
+
 	function WYY.ShowList(List)
 		for i,v in WYYUI.Pages["列表"].ScrollingFrame:GetChildren() do
 			if v:IsA("TextButton") then
 				v:Destroy()
 			end
 		end
-		
+
 		for _,id in List do
 			local Info = WYY.GetSongInfo(id)
 			WYY.NewSongButton(Info).Parent = WYYUI.Pages["列表"].ScrollingFrame
 		end
-		
+
 		WYY.TogglePage("列表")
 	end
 
 	function WYY.Init()
 		local SearchOffset = 0
 		local SearchText = WYYUI.Top.Search.TextBox.Text
-		
-		
+
+
 		WYYUI.Pages["列表"].TextButton.MouseButton1Click:Connect(function()
 			if WYY.CurrentPage then
 				WYY.TogglePage(WYY.CurrentPage)
@@ -3826,21 +3918,21 @@ do
 		end)
 		WYYUI.Sound:GetPropertyChangedSignal("PlaybackSpeed"):Connect(function()
 			local v = WYYUI.Sound.PlaybackSpeed/3
-			
+
 			local Display = math.floor(WYYUI.Sound.PlaybackSpeed * 100) / 100
-			
+
 			WYYUI.Rate.CurrentRate.Text = `{Display}x`
 			WYYUI.Frame.Rate.Text = `{Display}x`
-			
+
 			WYYUI.Rate.Scroll.Frame.Size = UDim2.fromScale(v,1)
 			WYYUI.Rate.Scroll.Point.Position = UDim2.fromScale(v,.5)
 		end)
-		
+
 		RunService.RenderStepped:Connect(function(dt)
 			if WYYUI.Sound.Playing then
 				WYYUI.Frame.Image.Frame.ImageLabel.Rotation += dt * 10
 			end
-			
+
 			WYYUI.Frame.Player.TextLabel.Text = `{fmtTime(WYYUI.Sound.TimePosition)}/{fmtTime(WYYUI.Sound.TimeLength)}`
 
 			local tl = WYYUI.Sound.TimeLength
@@ -3849,7 +3941,7 @@ do
 			WYYUI.Frame.Player.TextButton.Frame.Size = UDim2.fromScale(v,1)
 			WYYUI.Frame.Player.TextButton.Point.Position = UDim2.fromScale(v,.5)
 		end)
-		
+
 		local btn = WYYUI.Frame.Player.TextButton
 		btn.MouseButton1Down:Connect(function()
 			local ratioX
@@ -3861,7 +3953,7 @@ do
 					(mx - btn.AbsolutePosition.X) / math.max(1, btn.AbsoluteSize.X),
 					0, 1
 				)
-				
+
 				WYYUI.Frame.Player.TextButton.Frame.Size = UDim2.fromScale(ratioX,1)
 				WYYUI.Frame.Player.TextButton.Point.Position = UDim2.fromScale(ratioX,.5)
 			end
@@ -3876,31 +3968,31 @@ do
 					if WYYUI.Sound.TimeLength > 0 and ratioX then
 						WYYUI.Sound.TimePosition = WYYUI.Sound.TimeLength * ratioX
 					end
-					
+
 					a:Disconnect()
 					b:Disconnect()
 				end
 			end)
 		end)
-		
+
 		local function AddSearchSongs(Offset)
 			local List = WYY.Search(SearchText,10,Offset)
-			
+
 			for i,v in List do
 				WYY.NewSongButton(v).Parent = WYYUI.Pages["搜索"].ScrollingFrame
 			end
 		end
-		
+
 		WYYUI.Frame.Player.Frame.TextButton.MouseButton1Click:Connect(function()
 			if not WYY.PlayingSong then return end
-			
+
 			if WYYUI.Sound.Playing then
 				WYYUI.Sound:Pause()
 			else
 				WYYUI.Sound:Resume()
 			end
 		end)
-		
+
 		WYYUI.Frame.Player.Last.MouseButton1Click:Connect(function()
 			if not WYY.PlayingSong then return end
 			local CurrentId = WYY.PlayingSong.Id
@@ -3911,7 +4003,7 @@ do
 				else
 					index -= 1
 				end
-				
+
 				WYY.Play(WYY.SongList[index])
 			end
 		end)
@@ -3925,14 +4017,14 @@ do
 				else
 					index += 1
 				end
-				
+
 				WYY.Play(WYY.SongList[index])
 			end
 		end)
 		WYYUI.Frame.Love.MouseButton1Click:Connect(function()
 			if not WYY.PlayingSong then return end
 			local id = WYY.PlayingSong.Id
-			
+
 			if IsLoved(id) then
 				delfile(`music163/Loved/{id}`)
 				WYYUI.Frame.Love.Text = "♡"
@@ -3940,19 +4032,19 @@ do
 				writefile(`music163/Loved/{id}`,"Obi_xieO")
 				WYYUI.Frame.Love.Text = "❤"
 			end
-			
+
 			if WYY.RefreshLoved then
 				WYY.RefreshLoved()
 			end
 		end)
-		
+
 		WYYUI.Frame.Rate.MouseButton1Click:Connect(function()
 			WYYUI.Rate.Visible = not WYYUI.Rate.Visible
 		end)
 		WYYUI.Frame.Volume.MouseButton1Click:Connect(function()
 			WYYUI.Volume.Visible = not WYYUI.Volume.Visible
 		end)
-		
+
 		local ratebtn = WYYUI.Rate.TextButton
 		ratebtn.MouseButton1Down:Connect(function()
 			local ratioX
@@ -3964,7 +4056,7 @@ do
 					(mx - ratebtn.AbsolutePosition.X) / math.max(1, ratebtn.AbsoluteSize.X),
 					0, 1
 				)
-				
+
 				WYYUI.Rate.Scroll.Frame.Size = UDim2.fromScale(ratioX,1)
 				WYYUI.Rate.Scroll.Point.Position = UDim2.fromScale(ratioX,.5)
 				WYYUI.Rate.CurrentRate.Text = `{math.floor(300 * ratioX)/100}x`
@@ -3977,7 +4069,7 @@ do
 			local b;b = UserInputService.InputEnded:Connect(function(input)
 				if input.UserInputType == Enum.UserInputType.MouseButton1
 					or input.UserInputType == Enum.UserInputType.Touch then
-					
+
 					WYYUI.Sound.PlaybackSpeed = math.floor(300 * ratioX)/100
 
 					a:Disconnect()
@@ -3985,7 +4077,7 @@ do
 				end
 			end)
 		end)
-		
+
 		local volumebtn = WYYUI.Volume.TextButton
 		volumebtn.MouseButton1Down:Connect(function()
 			local ratioX
@@ -4016,7 +4108,7 @@ do
 				end
 			end)
 		end)
-		
+
 		WYYUI.Top.Search.TextBox.FocusLost:Connect(function(enter)
 			if enter then
 				for i,v in WYYUI.Pages["搜索"].ScrollingFrame:GetChildren() do
@@ -4024,18 +4116,18 @@ do
 						v:Destroy()
 					end
 				end
-				
+
 				WYY.TogglePage("搜索")
-				
+
 				SearchOffset = 1
 				SearchText = WYYUI.Top.Search.TextBox.Text
-				
+
 				AddSearchSongs(SearchOffset)
 			end
 		end)
 		WYYUI.Pages["搜索"].ScrollingFrame.LoadMore.MouseButton1Click:Connect(function()
 			SearchOffset += 1
-			
+
 			AddSearchSongs(SearchOffset)
 		end)
 		WYYUI.List.Buttons["搜索"].MouseButton1Click:Connect(function()
@@ -4056,11 +4148,11 @@ do
 			WYY.ShowList(WYY.SongList)
 			WYY.RefreshLoved = nil
 		end)
-		
+
 		WYYUI.Sound.Ended:Connect(function()
 			WYY.Play(WYY.PlayingSong.Id)
 		end)
-		
+
 		for i,v in WYY.Search("热歌",20,1) do
 			WYY.NewSongButton(v).Parent = WYYUI.Pages["推荐"].ScrollingFrame
 		end
